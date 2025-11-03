@@ -350,8 +350,8 @@ function App() {
             }
           }}
           onKeyDown={handleKeyDown}
-          placeholder={placeholder || 'Start typing medication name...'}
-          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-lime focus:border-primary-lime"
+          placeholder={placeholder || 'Medication...'}
+          className="w-full px-2 py-2 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-lime focus:border-primary-lime"
         />
 
         {showSuggestions && filteredMeds.length > 0 && (
@@ -365,7 +365,7 @@ function App() {
                 type="button"
                 onClick={() => handleSelect(medName)}
                 onMouseEnter={() => setSelectedIndex(index)}
-                className={`w-full text-left px-3 py-2 text-sm hover:bg-red-50 cursor-pointer ${
+                className={`w-full text-left px-2 py-1.5 text-xs hover:bg-red-50 cursor-pointer ${
                   index === selectedIndex ? 'bg-red-100' : ''
                 }`}
               >
@@ -909,50 +909,36 @@ function App() {
                     <>
                       <div className="space-y-2">
                         {allergies.map((allergy) => (
-                          <div key={allergy.id} className="space-y-2 p-3 bg-gradient-to-r from-red-50 to-orange-50 rounded-lg border border-red-100">
-                            <div className="flex gap-2 items-center">
-                              <div className="flex-1 relative">
-                                <AllergyMedicationAutocomplete
-                                  value={allergy.medication}
-                                  onSelect={(medName) => updateAllergy(allergy.id, 'medication', medName)}
-                                  placeholder="Start typing medication name..."
-                                />
-                              </div>
-                              <button
-                                onClick={() => removeAllergy(allergy.id)}
-                                className="text-red-500 hover:text-red-700 text-sm p-2"
-                                title="Remove allergy"
-                              >
-                                ✕
-                              </button>
-                            </div>
-                            <div className="space-y-2">
-                              <select
-                                value={allergy.reaction || ''}
-                                onChange={(e) => updateAllergy(allergy.id, 'reaction', e.target.value)}
-                                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-lime focus:border-primary-lime bg-white"
-                              >
-                                <option value="">Select reaction or type below</option>
-                                <option value="Anaphylaxis">Anaphylaxis</option>
-                                <option value="Angioedema">Angioedema</option>
-                                <option value="Hives/Urticaria">Hives/Urticaria</option>
-                                <option value="Rash">Rash</option>
-                                <option value="Itching">Itching</option>
-                                <option value="Swelling">Swelling</option>
-                                <option value="Difficulty breathing">Difficulty breathing</option>
-                                <option value="Nausea/Vomiting">Nausea/Vomiting</option>
-                                <option value="Gastrointestinal upset">Gastrointestinal upset</option>
-                                <option value="Headache">Headache</option>
-                                <option value="Dizziness">Dizziness</option>
-                              </select>
-                              <input
-                                type="text"
-                                value={allergy.reaction}
-                                onChange={(e) => updateAllergy(allergy.id, 'reaction', e.target.value)}
-                                placeholder="Or type reaction here"
-                                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-lime focus:border-primary-lime"
+                          <div key={allergy.id} className="flex gap-2 p-2 bg-gradient-to-r from-red-50 to-orange-50 rounded-lg border border-red-100">
+                            <div className="flex-1 relative min-w-0">
+                              <AllergyMedicationAutocomplete
+                                value={allergy.medication}
+                                onSelect={(medName) => updateAllergy(allergy.id, 'medication', medName)}
+                                placeholder="Medication..."
                               />
                             </div>
+                            <select
+                              value={allergy.reaction || ''}
+                              onChange={(e) => updateAllergy(allergy.id, 'reaction', e.target.value)}
+                              className="flex-1 px-2 py-2 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-lime focus:border-primary-lime bg-white min-w-0"
+                            >
+                              <option value="">Reaction</option>
+                              <option value="Anaphylaxis">Anaphylaxis</option>
+                              <option value="Angioedema">Angioedema</option>
+                              <option value="Hives">Hives</option>
+                              <option value="Rash">Rash</option>
+                              <option value="Swelling">Swelling</option>
+                              <option value="Breathing difficulty">Breathing difficulty</option>
+                              <option value="GI upset">GI upset</option>
+                              <option value="Other">Other</option>
+                            </select>
+                            <button
+                              onClick={() => removeAllergy(allergy.id)}
+                              className="text-red-500 hover:text-red-700 px-2"
+                              title="Remove"
+                            >
+                              ✕
+                            </button>
                           </div>
                         ))}
                       </div>
