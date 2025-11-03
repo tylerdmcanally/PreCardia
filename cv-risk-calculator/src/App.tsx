@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { PatientData, BPReading, Medication, Allergy, MedicationCategory, DomainName, ClinicalReport } from './types';
 import { performClinicalCalculations } from './logic/calculations';
 import { generateClinicalReport } from './logic/report/generateReport';
 import { formatReportAsText } from './logic/report/formatReport';
 import { MedicationAutocomplete } from './components/MedicationAutocomplete';
+import { MEDICATIONS } from './data/medications';
 import { 
   Activity, 
   Heart, 
@@ -264,6 +265,116 @@ function App() {
   const updateAllergy = (id: string, field: keyof Allergy, value: string) => {
     setAllergies(
       allergies.map((a) => (a.id === id ? { ...a, [field]: value } : a))
+    );
+  };
+
+  // Allergy medication autocomplete component
+  const AllergyMedicationAutocomplete = ({ value, onSelect, placeholder }: { value: string; onSelect: (medName: string) => void; placeholder?: string }) => {
+    const [searchTerm, setSearchTerm] = useState(value);
+    const [showSuggestions, setShowSuggestions] = useState(false);
+    const [selectedIndex, setSelectedIndex] = useState(-1);
+    const inputRef = useRef<HTMLInputElement>(null);
+    const dropdownRef = useRef<HTMLDivElement>(null);
+
+    // Create a flat list of unique medication names (generic + brand)
+    const allMedNames = MEDICATIONS.flatMap(med => [
+      med.name,
+      med.genericName,
+      ...med.brandNames
+    ]);
+
+    const filteredMeds = searchTerm.length > 0
+      ? [...new Set(allMedNames)].filter((name) =>
+          name.toLowerCase().includes(searchTerm.toLowerCase())
+        ).slice(0, 10)
+      : [];
+
+    useEffect(() => {
+      setSearchTerm(value);
+    }, [value]);
+
+    useEffect(() => {
+      const handleClickOutside = (event: MouseEvent) => {
+        if (
+          dropdownRef.current &&
+          !dropdownRef.current.contains(event.target as Node) &&
+          inputRef.current &&
+          !inputRef.current.contains(event.target as Node)
+        ) {
+          setShowSuggestions(false);
+        }
+      };
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const handleSelect = (medName: string) => {
+      onSelect(medName);
+      setSearchTerm(medName);
+      setShowSuggestions(false);
+      setSelectedIndex(-1);
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+      if (!showSuggestions) return;
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedIndex((prev) => (prev < filteredMeds.length - 1 ? prev + 1 : prev));
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedIndex((prev) => (prev > 0 ? prev - 1 : -1));
+      } else if (e.key === 'Enter' && selectedIndex >= 0) {
+        e.preventDefault();
+        handleSelect(filteredMeds[selectedIndex]);
+      } else if (e.key === 'Escape') {
+        setShowSuggestions(false);
+        setSelectedIndex(-1);
+      }
+    };
+
+    return (
+      <div className="relative">
+        <input
+          ref={inputRef}
+          type="text"
+          value={searchTerm}
+          onChange={(e) => {
+            setSearchTerm(e.target.value);
+            onSelect(e.target.value);
+            setShowSuggestions(true);
+            setSelectedIndex(-1);
+          }}
+          onFocus={() => {
+            if (searchTerm.length > 0) {
+              setShowSuggestions(true);
+            }
+          }}
+          onKeyDown={handleKeyDown}
+          placeholder={placeholder || 'Start typing medication name...'}
+          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-lime focus:border-primary-lime"
+        />
+
+        {showSuggestions && filteredMeds.length > 0 && (
+          <div
+            ref={dropdownRef}
+            className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto"
+          >
+            {filteredMeds.map((medName, index) => (
+              <button
+                key={`${medName}-${index}`}
+                type="button"
+                onClick={() => handleSelect(medName)}
+                onMouseEnter={() => setSelectedIndex(index)}
+                className={`w-full text-left px-3 py-2 text-sm hover:bg-red-50 cursor-pointer ${
+                  index === selectedIndex ? 'bg-red-100' : ''
+                }`}
+              >
+                <div className="font-medium text-gray-900">{medName}</div>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
     );
   };
 
@@ -798,28 +909,50 @@ function App() {
                     <>
                       <div className="space-y-2">
                         {allergies.map((allergy) => (
-                          <div key={allergy.id} className="flex gap-2 items-start">
-                            <input
-                              type="text"
-                              value={allergy.medication}
-                              onChange={(e) => updateAllergy(allergy.id, 'medication', e.target.value)}
-                              placeholder="Medication"
-                              className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-lime focus:border-primary-lime"
-                            />
-                            <input
-                              type="text"
-                              value={allergy.reaction}
-                              onChange={(e) => updateAllergy(allergy.id, 'reaction', e.target.value)}
-                              placeholder="Reaction"
-                              className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-lime focus:border-primary-lime"
-                            />
-                            <button
-                              onClick={() => removeAllergy(allergy.id)}
-                              className="text-red-500 hover:text-red-700 text-sm p-2"
-                              title="Remove allergy"
-                            >
-                              ✕
-                            </button>
+                          <div key={allergy.id} className="space-y-2 p-3 bg-gradient-to-r from-red-50 to-orange-50 rounded-lg border border-red-100">
+                            <div className="flex gap-2 items-center">
+                              <div className="flex-1 relative">
+                                <AllergyMedicationAutocomplete
+                                  value={allergy.medication}
+                                  onSelect={(medName) => updateAllergy(allergy.id, 'medication', medName)}
+                                  placeholder="Start typing medication name..."
+                                />
+                              </div>
+                              <button
+                                onClick={() => removeAllergy(allergy.id)}
+                                className="text-red-500 hover:text-red-700 text-sm p-2"
+                                title="Remove allergy"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                            <div className="space-y-2">
+                              <select
+                                value={allergy.reaction || ''}
+                                onChange={(e) => updateAllergy(allergy.id, 'reaction', e.target.value)}
+                                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-lime focus:border-primary-lime bg-white"
+                              >
+                                <option value="">Select reaction or type below</option>
+                                <option value="Anaphylaxis">Anaphylaxis</option>
+                                <option value="Angioedema">Angioedema</option>
+                                <option value="Hives/Urticaria">Hives/Urticaria</option>
+                                <option value="Rash">Rash</option>
+                                <option value="Itching">Itching</option>
+                                <option value="Swelling">Swelling</option>
+                                <option value="Difficulty breathing">Difficulty breathing</option>
+                                <option value="Nausea/Vomiting">Nausea/Vomiting</option>
+                                <option value="Gastrointestinal upset">Gastrointestinal upset</option>
+                                <option value="Headache">Headache</option>
+                                <option value="Dizziness">Dizziness</option>
+                              </select>
+                              <input
+                                type="text"
+                                value={allergy.reaction}
+                                onChange={(e) => updateAllergy(allergy.id, 'reaction', e.target.value)}
+                                placeholder="Or type reaction here"
+                                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-lime focus:border-primary-lime"
+                              />
+                            </div>
                           </div>
                         ))}
                       </div>
