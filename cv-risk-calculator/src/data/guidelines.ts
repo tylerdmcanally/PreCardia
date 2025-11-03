@@ -62,11 +62,39 @@ export const GUIDELINE_REFERENCES = [
 ];
 
 export const KEY_TRIALS = {
-  EMPA_REG: 'EMPA-REG OUTCOME: Empagliflozin cardiovascular outcomes in type 2 diabetes (N Engl J Med. 2015;373:2117-2128)',
-  SUSTAIN_6: 'SUSTAIN-6: Semaglutide and cardiovascular outcomes in type 2 diabetes (N Engl J Med. 2016;375:1834-1844)',
-  DAPA_HF: 'DAPA-HF: Dapagliflozin in patients with heart failure and reduced ejection fraction (N Engl J Med. 2019;381:1995-2008)',
-  PARADIGM_HF: 'PARADIGM-HF: Angiotensin-neprilysin inhibition versus enalapril in heart failure (N Engl J Med. 2014;371:993-1004)',
-  RE_LY: 'RE-LY: Dabigatran versus warfarin in atrial fibrillation (N Engl J Med. 2009;361:1139-1151)',
-  ROCKET_AF: 'ROCKET-AF: Rivaroxaban versus warfarin in nonvalvular atrial fibrillation (N Engl J Med. 2011;365:883-891)',
-  ARISTOTLE: 'ARISTOTLE: Apixaban versus warfarin in atrial fibrillation (N Engl J Med. 2011;365:981-992)',
+  EMPA_REG: {
+    name: 'EMPA-REG OUTCOME: Empagliflozin cardiovascular outcomes in type 2 diabetes',
+    citation: 'N Engl J Med. 2015;373:2117-2128',
+    url: 'https://www.nejm.org/doi/full/10.1056/NEJMoa1504720',
+  },
+  SUSTAIN_6: {
+    name: 'SUSTAIN-6: Semaglutide and cardiovascular outcomes in type 2 diabetes',
+    citation: 'N Engl J Med. 2016;375:1834-1844',
+    url: 'https://www.nejm.org/doi/full/10.1056/NEJMoa1607141',
+  },
+  DAPA_HF: {
+    name: 'DAPA-HF: Dapagliflozin in patients with heart failure and reduced ejection fraction',
+    citation: 'N Engl J Med. 2019;381:1995-2008',
+    url: 'https://www.nejm.org/doi/full/10.1056/NEJMoa1911303',
+  },
+  PARADIGM_HF: {
+    name: 'PARADIGM-HF: Angiotensin-neprilysin inhibition versus enalapril in heart failure',
+    citation: 'N Engl J Med. 2014;371:993-1004',
+    url: 'https://www.nejm.org/doi/full/10.1056/NEJMoa1409077',
+  },
+  RE_LY: {
+    name: 'RE-LY: Dabigatran versus warfarin in atrial fibrillation',
+    citation: 'N Engl J Med. 2009;361:1139-1151',
+    url: 'https://www.nejm.org/doi/full/10.1056/NEJMoa0905561',
+  },
+  ROCKET_AF: {
+    name: 'ROCKET-AF: Rivaroxaban versus warfarin in nonvalvular atrial fibrillation',
+    citation: 'N Engl J Med. 2011;365:883-891',
+    url: 'https://www.nejm.org/doi/full/10.1056/NEJMoa1009638',
+  },
+  ARISTOTLE: {
+    name: 'ARISTOTLE: Apixaban versus warfarin in atrial fibrillation',
+    citation: 'N Engl J Med. 2011;365:981-992',
+    url: 'https://www.nejm.org/doi/full/10.1056/NEJMoa1107039',
+  },
 };

@@ -130,7 +130,9 @@ export function formatReportAsText(report: ClinicalReport): string {
   output += '─'.repeat(60) + '\n';
   output += 'EVIDENCE REFERENCES\n';
   output += '─'.repeat(60) + '\n\n';
-  output += report.references + '\n\n';
+  output += report.references;
+  output += '\nNOTE: URLs above are clickable links when viewed digitally.\n';
+  output += 'Copy report text to access full guideline documents.\n\n';
 
   // Disclaimer
   output += '─'.repeat(60) + '\n';

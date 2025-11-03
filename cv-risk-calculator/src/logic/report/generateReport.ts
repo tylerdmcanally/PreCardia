@@ -1,6 +1,7 @@
 import { PatientData, ClinicalCalculations, ClinicalReport, MedicationReview, Medication, ClinicalDomain } from '../../types';
 import { generateAllDomainRecommendations } from '../recommendations';
 import { buildMonitoringPlan } from './monitoringPlan';
+import { GUIDELINE_REFERENCES, KEY_TRIALS } from '../../data/guidelines';
 
 export function generateClinicalReport(
   patientData: PatientData,
@@ -255,16 +256,31 @@ function compileReferences(domains: any[]): string {
   });
 
   let refs = 'Guidelines:\n';
-  Array.from(guidelinesUsed)
-    .filter((g) => g)
-    .forEach((guideline, index) => {
-      refs += `${index + 1}. ${guideline}\n`;
-    });
+  let guidelineCount = 0;
+
+  // Match guidelines used with their full references including URLs
+  GUIDELINE_REFERENCES.forEach((guidelineRef) => {
+    if (Array.from(guidelinesUsed).some((g) => g === guidelineRef.short)) {
+      guidelineCount++;
+      refs += `${guidelineCount}. ${guidelineRef.full}\n`;
+      refs += `   ${guidelineRef.citation}\n`;
+      refs += `   ${guidelineRef.url}\n\n`;
+    }
+  });
 
   if (trialsUsed.size > 0) {
-    refs += '\nKey Clinical Trials:\n';
+    refs += 'Key Clinical Trials:\n';
     Array.from(trialsUsed).forEach((trial) => {
-      refs += `• ${trial}\n`;
+      // Add trial details from KEY_TRIALS if available
+      const trialKey = trial.toUpperCase().replace(/\s+/g, '_').replace('-', '_');
+      if (trialKey in KEY_TRIALS) {
+        const trialData = KEY_TRIALS[trialKey as keyof typeof KEY_TRIALS];
+        refs += `• ${trialData.name}\n`;
+        refs += `  ${trialData.citation}\n`;
+        refs += `  ${trialData.url}\n\n`;
+      } else {
+        refs += `• ${trial}\n`;
+      }
     });
   }
 
