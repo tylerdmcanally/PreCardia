@@ -101,6 +101,15 @@ function App() {
   const [nkda, setNkda] = useState(false); // No Known Drug Allergies
 
   const onGenerateReport = () => {
+    // Validate allergies - must have both medication and reaction if not NKDA
+    if (!nkda && allergies.length > 0) {
+      const incompleteAllergies = allergies.filter(allergy => !allergy.medication || !allergy.reaction);
+      if (incompleteAllergies.length > 0) {
+        alert('Please complete all allergy entries. Each allergy must have both medication and reaction.');
+        return;
+      }
+    }
+    
     const patientData: PatientData = {
       demographics: {
         age: parseFloat(age) || 0,
@@ -944,6 +953,12 @@ function App() {
                       </div>
                       <button
                         onClick={() => {
+                          // Check if there's an incomplete allergy first
+                          const hasIncompleteAllergy = allergies.some(allergy => !allergy.medication || !allergy.reaction);
+                          if (hasIncompleteAllergy) {
+                            alert('Please complete the medication and reaction fields before adding another allergy.');
+                            return;
+                          }
                           addAllergy();
                           setNkda(false);
                         }}
