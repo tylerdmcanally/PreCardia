@@ -52,10 +52,43 @@ export function performClinicalCalculations(patientData: PatientData): ClinicalC
     ascvdRisk,
   });
 
-  // LDL goal
-  let ldlGoal = 100;
-  if (hasASCVD) ldlGoal = 70;
-  if (hasASCVD && ascvdRisk >= 20) ldlGoal = 55;
+  // LDL goal - based on 2025 ESC/EAS Guidelines
+  let ldlGoal = 116; // Low risk default
+
+  // Determine risk category and corresponding LDL goal
+  const hasDiabetesWithRiskFactors = history.diabetes && (
+    history.hypertension ||
+    demographics.smokingStatus === 'current' ||
+    egfr < 60 ||
+    demographics.age > 50
+  );
+
+  const hasModerateRisk = hasDiabetesWithRiskFactors && !hasASCVD;
+  const hasHighRisk = (
+    labs.ldl && labs.ldl >= 190 || // LDL ≥190 is high risk
+    egfr >= 30 && egfr < 60 || // Moderate CKD
+    (history.diabetes && !hasASCVD && (demographics.age > 60 || hasDiabetesWithRiskFactors)) ||
+    ascvdRisk >= 7.5 && ascvdRisk < 20 // High 10-year risk
+  );
+
+  const hasVeryHighRisk = hasASCVD || ascvdRisk >= 20 || egfr < 30;
+
+  // Extreme risk: recurrent events or polyvascular disease
+  const hasRecurrentEvents = [history.priorMI, history.stroke, history.tia].filter(Boolean).length >= 2;
+  const hasPolyvascularDisease = [history.cad, history.priorMI, history.pad, history.stroke].filter(Boolean).length >= 2;
+  const hasExtremeRisk = hasASCVD && (hasRecurrentEvents || hasPolyvascularDisease);
+
+  // Set LDL goal based on risk category (most aggressive category wins)
+  if (hasExtremeRisk) {
+    ldlGoal = 40; // Extreme risk (NEW in 2025 ESC/EAS)
+  } else if (hasVeryHighRisk) {
+    ldlGoal = 55; // Very high risk
+  } else if (hasHighRisk) {
+    ldlGoal = 70; // High risk
+  } else if (hasModerateRisk) {
+    ldlGoal = 100; // Moderate risk
+  }
+  // else ldlGoal remains 116 for low risk
 
   // A1c goal
   const a1cGoal = 7;

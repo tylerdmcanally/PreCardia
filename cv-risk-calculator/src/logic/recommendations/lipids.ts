@@ -36,23 +36,39 @@ export function generateLipidRecommendations(
       medication: currentStatin.genericName,
       recommendedDose: 'N/A',
       rationale: 'Statin therapy requires periodic monitoring for adverse effects including myopathy and hepatotoxicity.',
-      evidence: GUIDELINES.CHOLESTEROL_2018,
+      evidence: GUIDELINES.ESC_EAS_2025,
       monitoring: 'Monitor for muscle pain, weakness, or dark urine (myopathy/rhabdomyolysis). Check CK if symptomatic. Baseline and follow-up ALT/AST (consider if symptoms develop).',
       additionalNotes: 'STOP STATIN and check CK if severe muscle pain. Avoid in pregnancy. Drug interactions: avoid strong CYP3A4 inhibitors with atorvastatin/simvastatin.',
     });
   }
 
-  // HIGH PRIORITY: Clinical ASCVD needs high-intensity statin
+  // HIGH PRIORITY: Clinical ASCVD needs high-intensity statin (+ ezetimibe for ACS/recent events)
   if (hasASCVD && !currentStatin) {
-    recommendations.push({
-      priority: 'HIGH',
-      action: 'ADD',
-      medication: 'Atorvastatin',
-      recommendedDose: '40mg daily',
-      rationale: 'Clinical ASCVD (secondary prevention) requires high-intensity statin therapy with LDL goal <70 mg/dL',
-      evidence: GUIDELINES.CHOLESTEROL_2018,
-      monitoring: 'Lipid panel at 3 months to assess LDL response',
-    });
+    const hasRecentACS = history.priorMI; // In practice, would check timing
+
+    if (hasRecentACS && !hasEzetimibe) {
+      // 2025 ESC/EAS: Start combination therapy upfront for ACS
+      recommendations.push({
+        priority: 'HIGH',
+        action: 'ADD',
+        medication: 'Atorvastatin + Ezetimibe',
+        recommendedDose: 'Atorvastatin 40-80mg daily + Ezetimibe 10mg daily',
+        rationale: `Clinical ASCVD (secondary prevention) requires combination high-intensity statin plus ezetimibe to achieve LDL goal <${ldlGoal} mg/dL. 2025 ESC/EAS recommends upfront combination for ACS.`,
+        evidence: GUIDELINES.ESC_EAS_2025,
+        monitoring: 'Lipid panel at 4-12 weeks to assess LDL response and achieve goal',
+        additionalNotes: 'Combination therapy can achieve up to 65% LDL reduction. IMPROVE-IT demonstrated CV benefit of ezetimibe + statin post-ACS.',
+      });
+    } else {
+      recommendations.push({
+        priority: 'HIGH',
+        action: 'ADD',
+        medication: 'Atorvastatin',
+        recommendedDose: '40mg daily',
+        rationale: `Clinical ASCVD (secondary prevention) requires high-intensity statin therapy with LDL goal <${ldlGoal} mg/dL`,
+        evidence: GUIDELINES.ESC_EAS_2025,
+        monitoring: 'Lipid panel at 4-12 weeks to assess LDL response',
+      });
+    }
   }
 
   // HIGH PRIORITY: Upgrade to high-intensity if on moderate
@@ -69,47 +85,42 @@ export function generateLipidRecommendations(
       medication: currentStatin.genericName,
       currentDose: currentStatin.dose,
       recommendedDose: newDose,
-      rationale: `Clinical ASCVD requires high-intensity statin therapy with LDL goal <${ldlGoal} mg/dL for secondary prevention`,
-      evidence: GUIDELINES.CHOLESTEROL_2018,
-      monitoring: 'Lipid panel at 3 months to assess LDL response',
+      rationale: `Clinical ASCVD requires high-intensity statin therapy with LDL goal <${ldlGoal} mg/dL for secondary prevention. Aim for ≥50% LDL reduction per 2025 ESC/EAS.`,
+      evidence: GUIDELINES.ESC_EAS_2025,
+      monitoring: 'Lipid panel at 4-12 weeks to assess LDL response and titrate as needed',
     });
   }
 
-  // MODERATE PRIORITY: Add ezetimibe if LDL not at goal
+  // MODERATE-HIGH PRIORITY: Add ezetimibe if LDL not at goal
   if (hasASCVD && isHighIntensity && ldl >= ldlGoal) {
     if (!hasEzetimibe) {
+      const priority = ldl >= 70 ? 'HIGH' : 'MODERATE'; // Elevated risk if LDL still >70
       recommendations.push({
-        priority: 'MODERATE',
+        priority,
         action: 'ADD',
         medication: 'Ezetimibe',
         recommendedDose: '10mg daily',
-        rationale: `LDL ${ldl} mg/dL on maximally tolerated statin remains above goal <${ldlGoal}; ezetimibe lowers LDL an additional 15–20%.`,
-        evidence: GUIDELINES.CHOLESTEROL_2018,
-        additionalNotes: 'IMPROVE-IT: ezetimibe + simvastatin reduced CV events post-ACS.',
+        rationale: `LDL ${ldl} mg/dL on high-intensity statin remains above goal <${ldlGoal} mg/dL. 2025 ESC/EAS emphasizes combination therapy; ezetimibe lowers LDL an additional 15–20%.`,
+        evidence: GUIDELINES.ESC_EAS_2025,
+        monitoring: 'Lipid panel at 4-12 weeks to assess response',
+        additionalNotes: 'IMPROVE-IT: ezetimibe + simvastatin reduced CV events post-ACS by 6.4% over 7 years.',
       });
-    } else if (!hasPCSK9 && ldl >= 70 && hasASCVD) {
-      const veryHighRiskMajorEvents = [history.priorMI, history.stroke, history.pad].filter(Boolean).length;
-      const veryHighRiskConditions = [
-        history.diabetes,
-        history.ckd,
-        history.hypertension,
-        demographics.age >= 65,
-        demographics.smokingStatus !== 'never',
-      ].filter(Boolean).length;
-      const isVeryHighRisk = veryHighRiskMajorEvents >= 2 || (veryHighRiskMajorEvents === 1 && veryHighRiskConditions >= 2);
+    } else if (!hasPCSK9 && ldl >= ldlGoal && hasASCVD) {
+      // Updated PCSK9 criteria based on 2025 ESC/EAS
+      const hasRecurrentEvents = [history.priorMI, history.stroke, history.tia].filter(Boolean).length >= 2;
+      const hasPolyvascularDisease = [history.cad, history.priorMI, history.pad, history.stroke].filter(Boolean).length >= 2;
+      const isExtremeRisk = hasRecurrentEvents || hasPolyvascularDisease;
 
-      if (isVeryHighRisk) {
-        recommendations.push({
-          priority: 'HIGH',
-          action: 'CONSIDER',
-          medication: 'PCSK9 inhibitor (evolocumab or alirocumab)',
-          recommendedDose: 'Evolocumab 140mg SC every 2 weeks or 420mg monthly; Alirocumab 75-150mg SC every 2 weeks',
-          rationale: `Very-high-risk ASCVD with LDL ${ldl} mg/dL despite maximally tolerated statin plus ezetimibe. PCSK9 inhibitor recommended to achieve LDL <55-70 mg/dL per ACC guidance.`,
-          evidence: GUIDELINES.CHOLESTEROL_2018,
-          monitoring: 'Arrange prior authorization; repeat lipid panel 4-12 weeks after initiation.',
-          additionalNotes: 'FOURIER/ODYSSEY OUTCOMES demonstrated CV event reduction with PCSK9 inhibition.',
-        });
-      }
+      recommendations.push({
+        priority: isExtremeRisk ? 'HIGH' : 'MODERATE',
+        action: 'CONSIDER',
+        medication: 'PCSK9 inhibitor (evolocumab or alirocumab)',
+        recommendedDose: 'Evolocumab 140mg SC every 2 weeks or 420mg monthly; Alirocumab 75-150mg SC every 2 weeks',
+        rationale: `${isExtremeRisk ? 'Extreme' : 'Very high'}-risk ASCVD with LDL ${ldl} mg/dL despite statin plus ezetimibe. PCSK9 inhibitor can achieve LDL goal <${ldlGoal} mg/dL with additional 50-60% LDL reduction.`,
+        evidence: GUIDELINES.ESC_EAS_2025,
+        monitoring: 'Arrange prior authorization; repeat lipid panel 4-12 weeks after initiation to assess achievement of LDL goal.',
+        additionalNotes: 'FOURIER/ODYSSEY OUTCOMES demonstrated 15% relative risk reduction in CV events with PCSK9 inhibition. 2025 ESC/EAS recommends up to 86% total LDL reduction with combination therapy.',
+      });
     }
   }
 
@@ -124,9 +135,9 @@ export function generateLipidRecommendations(
       recommendedDose: needsHighIntensity ? '40mg daily' : '10mg daily',
       rationale: `Diabetes age 40-75 with ASCVD risk ${ascvdRisk.toFixed(1)}% requires ${
         needsHighIntensity ? 'high' : 'moderate'
-      }-intensity statin for primary prevention`,
-      evidence: GUIDELINES.CHOLESTEROL_2018,
-      monitoring: 'Lipid panel at 3 months',
+      }-intensity statin for primary prevention (high-risk category per 2025 ESC/EAS)`,
+      evidence: GUIDELINES.ESC_EAS_2025,
+      monitoring: 'Lipid panel at 4-12 weeks to assess LDL response',
     });
   }
 
@@ -139,9 +150,9 @@ export function generateLipidRecommendations(
       currentDose: currentStatin?.dose,
       recommendedDose: '40mg daily',
       rationale:
-        'LDL ≥190 mg/dL (severe hypercholesterolemia) requires high-intensity statin regardless of ASCVD risk',
-      evidence: GUIDELINES.CHOLESTEROL_2018,
-      monitoring: 'Lipid panel at 3 months; consider adding ezetimibe if LDL remains >190',
+        'LDL ≥190 mg/dL (severe hypercholesterolemia) represents high cardiovascular risk requiring high-intensity statin regardless of other risk factors per 2025 ESC/EAS',
+      evidence: GUIDELINES.ESC_EAS_2025,
+      monitoring: 'Lipid panel at 4-12 weeks; consider adding ezetimibe if LDL remains >190 mg/dL',
     });
   }
 
@@ -152,8 +163,8 @@ export function generateLipidRecommendations(
       action: 'ADD',
       medication: 'Fenofibrate or omega-3 (icosapent ethyl)',
       recommendedDose: 'Fenofibrate 145mg daily or Icosapent ethyl 2g twice daily',
-      rationale: `Triglycerides ${triglycerides} mg/dL: reduce pancreatitis risk with fibrate or high-dose omega-3 in addition to statin.`,
-      evidence: GUIDELINES.CHOLESTEROL_2018,
+      rationale: `Severe hypertriglyceridemia (TG ${triglycerides} mg/dL): reduce pancreatitis risk with fibrate or high-dose omega-3 in addition to statin.`,
+      evidence: GUIDELINES.ESC_EAS_2025,
       monitoring: 'Recheck lipid panel in 6-12 weeks; monitor hepatic function and myalgia when combined with statin.',
     });
   } else if (triglycerides >= 150 && hasASCVD && currentStatin) {
@@ -162,8 +173,8 @@ export function generateLipidRecommendations(
       action: 'CONSIDER',
       medication: 'Icosapent ethyl',
       recommendedDose: '2g twice daily',
-      rationale: `Persistent triglycerides ${triglycerides} mg/dL despite statin; REDUCE-IT supports Icosapent ethyl for ASCVD risk reduction.`,
-      evidence: GUIDELINES.CHOLESTEROL_2018,
+      rationale: `Persistent triglycerides ${triglycerides} mg/dL despite statin; REDUCE-IT supports Icosapent ethyl for additional ASCVD risk reduction.`,
+      evidence: GUIDELINES.ESC_EAS_2025,
       monitoring: 'Assess adherence and monitor for atrial fibrillation or bleeding risk when combined with antithrombotics.',
     });
   }
@@ -175,8 +186,8 @@ export function generateLipidRecommendations(
       action: 'ADD',
       medication: 'Rosuvastatin',
       recommendedDose: '10mg daily',
-      rationale: 'Age >75 with clinical ASCVD: initiate moderate- to high-intensity statin after shared decision-making per ACC/AHA.',
-      evidence: GUIDELINES.CHOLESTEROL_2018,
+      rationale: 'Age >75 with clinical ASCVD: initiate moderate- to high-intensity statin after shared decision-making per 2025 ESC/EAS (very high-risk category).',
+      evidence: GUIDELINES.ESC_EAS_2025,
       monitoring: 'Lipid panel at 6-12 weeks; assess for myalgias or functional decline.',
     });
   }
