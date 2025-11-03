@@ -62,6 +62,7 @@ export interface Allergy {
 
 export interface LabValues {
   creatinine?: number;
+  egfr?: number;
   creatinineDate?: string;
   potassium?: number;
   sodium?: number;

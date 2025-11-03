@@ -13,7 +13,7 @@ export function performClinicalCalculations(patientData: PatientData): ClinicalC
     ? calculateBMI(demographics.heightFeet, demographics.heightInches, demographics.weightLbs)
     : 0;
 
-  // eGFR
+  // eGFR - auto-calculate from creatinine using CKD-EPI 2021 equation
   const egfr = labs.creatinine ? calculateEGFR(labs.creatinine, demographics.age, demographics.sex) : 0;
   const ckdStage = egfr > 0 ? stageCKD(egfr) : history.ckdStage || 0;
 
