@@ -55,43 +55,56 @@ export function performClinicalCalculations(patientData: PatientData): ClinicalC
     ascvdRisk,
   });
 
-  // LDL goal - based on 2025 ESC/EAS Guidelines
-  let ldlGoal = 116; // Low risk default
+  // LDL goal - based on 2018 ACC/AHA Cholesterol Guideline
+  let ldlGoal = 100; // Default for low-moderate risk
 
-  // Determine risk category and corresponding LDL goal
-  const hasDiabetesWithRiskFactors = history.diabetes && (
-    history.hypertension ||
-    demographics.smokingStatus === 'current' ||
-    egfr < 60 ||
-    demographics.age > 50
-  );
+  // Very high-risk ASCVD: multiple major ASCVD events or 1 major event + multiple high-risk conditions
+  const hasMajorASCVDEvents = [history.priorMI, history.stroke].filter(Boolean).length >= 2;
+  const hasHighRiskConditions = [
+    history.diabetes,
+    history.hypertension,
+    demographics.smokingStatus === 'current',
+    egfr < 60,
+    labs.ldl && labs.ldl >= 100 // persistently elevated LDL despite therapy
+  ].filter(Boolean).length >= 2;
+  const isVeryHighRiskASCVD = hasASCVD && (hasMajorASCVDEvents || hasHighRiskConditions);
 
-  const hasModerateRisk = hasDiabetesWithRiskFactors && !hasASCVD;
-  const hasHighRisk = (
-    labs.ldl && labs.ldl >= 190 || // LDL ≥190 is high risk
-    egfr >= 30 && egfr < 60 || // Moderate CKD
-    (history.diabetes && !hasASCVD && (demographics.age > 60 || hasDiabetesWithRiskFactors)) ||
-    ascvdRisk >= 7.5 && ascvdRisk < 20 // High 10-year risk
-  );
-
-  const hasVeryHighRisk = hasASCVD || ascvdRisk >= 20 || egfr < 30;
-
-  // Extreme risk: recurrent events or polyvascular disease
-  const hasRecurrentEvents = [history.priorMI, history.stroke, history.tia].filter(Boolean).length >= 2;
-  const hasPolyvascularDisease = [history.cad, history.priorMI, history.pad, history.stroke].filter(Boolean).length >= 2;
-  const hasExtremeRisk = hasASCVD && (hasRecurrentEvents || hasPolyvascularDisease);
-
-  // Set LDL goal based on risk category (most aggressive category wins)
-  if (hasExtremeRisk) {
-    ldlGoal = 40; // Extreme risk (NEW in 2025 ESC/EAS)
-  } else if (hasVeryHighRisk) {
-    ldlGoal = 55; // Very high risk
-  } else if (hasHighRisk) {
-    ldlGoal = 70; // High risk
-  } else if (hasModerateRisk) {
-    ldlGoal = 100; // Moderate risk
+  // Clinical ASCVD (secondary prevention)
+  if (isVeryHighRiskASCVD) {
+    ldlGoal = 55; // Very high-risk ASCVD (2022 ACC Expert Consensus)
+  } else if (hasASCVD) {
+    ldlGoal = 70; // Clinical ASCVD (standard secondary prevention)
   }
-  // else ldlGoal remains 116 for low risk
+  // Severe primary hypercholesterolemia (LDL ≥190)
+  else if (labs.ldl && labs.ldl >= 190) {
+    ldlGoal = 100; // Primary severe hypercholesterolemia
+  }
+  // Diabetes age 40-75
+  else if (history.diabetes && demographics.age >= 40 && demographics.age <= 75) {
+    // High-risk diabetes: 10-year ASCVD ≥20% or multiple risk factors
+    const hasMultipleDMRiskFactors = [
+      history.hypertension,
+      demographics.smokingStatus === 'current',
+      egfr < 60,
+      demographics.age >= 55
+    ].filter(Boolean).length >= 2;
+
+    if (ascvdRisk >= 20 || hasMultipleDMRiskFactors) {
+      ldlGoal = 70; // High-risk diabetes
+    } else {
+      ldlGoal = 100; // Moderate-risk diabetes
+    }
+  }
+  // Primary prevention with elevated 10-year ASCVD risk
+  else if (ascvdRisk >= 7.5 && ascvdRisk < 20) {
+    ldlGoal = 100; // Intermediate risk (7.5-20%)
+  } else if (ascvdRisk >= 20) {
+    ldlGoal = 70; // High risk (≥20%)
+  }
+  // Low risk (<5%) or borderline risk (5-7.5%) - lifestyle, consider statin with risk enhancers
+  else if (ascvdRisk < 7.5) {
+    ldlGoal = 100; // Conservative goal for those on therapy
+  }
 
   // A1c goal
   const a1cGoal = 7;

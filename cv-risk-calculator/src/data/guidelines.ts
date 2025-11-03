@@ -1,7 +1,7 @@
 export const GUIDELINES = {
   BP_2017: '2017 ACC/AHA HTN Guideline',
   CHOLESTEROL_2018: '2018 ACC/AHA Cholesterol Guideline',
-  ESC_EAS_2025: '2025 ESC/EAS Focused Update on Dyslipidaemias',
+  CHOLESTEROL_2022: '2022 ACC Expert Consensus on Non-Statin Therapies',
   PREVENT_2023: '2023 AHA PREVENT Equations',
   ADA_2024: '2024 ADA Standards of Care',
   KDIGO_2022: '2022 KDIGO Guidelines',
@@ -26,10 +26,10 @@ export const GUIDELINE_REFERENCES = [
     url: 'https://www.ahajournals.org/doi/10.1161/CIR.0000000000000625',
   },
   {
-    short: GUIDELINES.ESC_EAS_2025,
-    full: '2025 Focused Update of the 2019 ESC/EAS Guidelines for the management of dyslipidaemias',
-    citation: 'Eur Heart J. 2025;46(13):1051-1068',
-    url: 'https://academic.oup.com/eurheartj/advance-article/doi/10.1093/eurheartj/ehaf190/8234482',
+    short: GUIDELINES.CHOLESTEROL_2022,
+    full: '2022 ACC Expert Consensus Decision Pathway on the Role of Nonstatin Therapies for LDL-Cholesterol Lowering in the Management of Atherosclerotic Cardiovascular Disease Risk',
+    citation: 'J Am Coll Cardiol. 2022;80(14):1366-1418',
+    url: 'https://www.jacc.org/doi/10.1016/j.jacc.2022.07.006',
   },
   {
     short: GUIDELINES.PREVENT_2023,
