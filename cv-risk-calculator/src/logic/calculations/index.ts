@@ -2,7 +2,7 @@ import { PatientData, ClinicalCalculations } from '../../types';
 import { calculateBMI } from './bmi';
 import { calculateEGFR, stageCKD } from './egfr';
 import { calculateAverageBP, classifyBloodPressure, determineBPTarget } from './bpClassification';
-import { calculateASCVDRisk, categorizeASCVDRisk } from './ascvd';
+import { calculatePREVENTRisk, categorizePREVENTRisk } from './prevent';
 import { calculateCHA2DS2VASc, interpretCHA2DS2VASc } from './cha2ds2vasc';
 
 export function performClinicalCalculations(patientData: PatientData): ClinicalCalculations {
@@ -21,27 +21,29 @@ export function performClinicalCalculations(patientData: PatientData): ClinicalC
   const averageBP = calculateAverageBP(bpReadings);
   const bpClassification = classifyBloodPressure(averageBP.systolic, averageBP.diastolic);
 
-  // ASCVD
-  const hasMinimalLabsForASCVD = labs.totalCholesterol && labs.hdl && averageBP.systolic > 0;
-  const ascvdRisk = hasMinimalLabsForASCVD
-    ? calculateASCVDRisk({
+  // PREVENT 10-year Total CVD Risk (replaces Pooled Cohort ASCVD)
+  const hasMinimalLabsForPREVENT = labs.totalCholesterol && labs.hdl && averageBP.systolic > 0 && bmi > 0 && egfr > 0;
+  const ascvdRisk = hasMinimalLabsForPREVENT
+    ? calculatePREVENTRisk({
         age: demographics.age,
         sex: demographics.sex,
-        race: demographics.race,
         totalCholesterol: labs.totalCholesterol!,
         hdl: labs.hdl!,
         systolicBP: averageBP.systolic,
         onBPMeds: patientData.medications.some((m) =>
-          ['ACE Inhibitor', 'ARB', 'Beta Blocker', 'Calcium Channel Blocker', 'Diuretic - Thiazide'].includes(
+          ['ACE Inhibitor', 'ARB', 'Beta Blocker', 'Calcium Channel Blocker', 'Diuretic - Thiazide', 'Diuretic - Loop'].includes(
             m.category
           )
         ),
         diabetic: history.diabetes,
         smoker: demographics.smokingStatus === 'current',
+        bmi,
+        egfr,
+        onStatin: patientData.medications.some((m) => m.category === 'Statin'),
       })
     : 0;
 
-  const ascvdCategory = categorizeASCVDRisk(ascvdRisk);
+  const ascvdCategory = categorizePREVENTRisk(ascvdRisk);
 
   // Determine targets
   const hasASCVD = history.cad || history.priorMI || history.stroke || history.pad;
@@ -134,5 +136,5 @@ export function performClinicalCalculations(patientData: PatientData): ClinicalC
 export * from './bmi';
 export * from './egfr';
 export * from './bpClassification';
-export * from './ascvd';
+export * from './prevent';
 export * from './cha2ds2vasc';

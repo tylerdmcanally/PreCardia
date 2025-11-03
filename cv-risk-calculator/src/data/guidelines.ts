@@ -2,6 +2,7 @@ export const GUIDELINES = {
   BP_2017: '2017 ACC/AHA HTN Guideline',
   CHOLESTEROL_2018: '2018 ACC/AHA Cholesterol Guideline',
   ESC_EAS_2025: '2025 ESC/EAS Focused Update on Dyslipidaemias',
+  PREVENT_2023: '2023 AHA PREVENT Equations',
   ADA_2024: '2024 ADA Standards of Care',
   KDIGO_2022: '2022 KDIGO Guidelines',
   HF_2022: '2022 ACC/AHA/HFSA Heart Failure Guideline',
@@ -29,6 +30,12 @@ export const GUIDELINE_REFERENCES = [
     full: '2025 Focused Update of the 2019 ESC/EAS Guidelines for the management of dyslipidaemias',
     citation: 'Eur Heart J. 2025;46(13):1051-1068',
     url: 'https://academic.oup.com/eurheartj/advance-article/doi/10.1093/eurheartj/ehaf190/8234482',
+  },
+  {
+    short: GUIDELINES.PREVENT_2023,
+    full: '2023 American Heart Association PREVENT Equations for Cardiovascular Disease Risk Assessment',
+    citation: 'Khan SS, Matsushita K, Sang Y, et al. Circulation. 2023;149:430-449',
+    url: 'https://www.ahajournals.org/doi/10.1161/CIRCULATIONAHA.123.067626',
   },
   {
     short: GUIDELINES.ADA_2024,
