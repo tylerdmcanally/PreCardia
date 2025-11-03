@@ -211,25 +211,42 @@ function checkIfNeedsOptimization(
 }
 
 function buildFollowUpPlan(calculations: ClinicalCalculations, domains: any[]): string {
-  let plan = 'Next Appointment: 2-4 weeks\n';
-  plan += 'Focus: BP check, review labs (BMP), assess medication tolerability\n\n';
-  plan += '3-Month Follow-Up:\n';
-  plan += 'Focus: Reassess BP control, review lipid panel and A1c, smoking status\n\n';
+  const allRecs = domains.flatMap((d: any) => d.recommendations);
+
+  // Determine next appointment timing based on urgency
+  const timing = determineNextAppointmentTiming(allRecs, calculations);
+
+  // Build specific focus areas based on recommendations
+  const focusAreas = buildNextVisitFocus(allRecs, calculations);
+
+  let plan = `Next Appointment: ${timing}\n`;
+  plan += `Focus: ${focusAreas.join(', ')}\n\n`;
+
+  // 3-month follow-up
+  const threeMonthFocus = buildThreeMonthFocus(allRecs, calculations);
+  if (threeMonthFocus.length > 0) {
+    plan += '3-Month Follow-Up:\n';
+    plan += `Focus: ${threeMonthFocus.join(', ')}\n\n`;
+  }
+
+  // Target goals for next visit
   plan += 'Target Goals for Next Visit:\n';
   plan += `• BP <${calculations.bpTarget.systolic}/${calculations.bpTarget.diastolic} mmHg (home readings)\n`;
   plan += '• Medication adherence and tolerability\n';
 
-  const hasSmokingRec = domains.some((d) =>
-    d.recommendations.some(
-      (r: any) => r.medication.toLowerCase().includes('smoking') || r.rationale.toLowerCase().includes('smoking')
-    )
+  const hasSmokingRec = allRecs.some(
+    (r: any) => r.medication.toLowerCase().includes('smoking') || r.rationale.toLowerCase().includes('smoking')
   );
   if (hasSmokingRec) {
     plan += '• Smoking cessation progress\n';
   }
 
-  plan += '• Home BP log review\n\n';
-  plan += 'Long-Term Goals:\n';
+  const hasBPRecs = domains.some((d: any) => d.name === 'BLOOD_PRESSURE' && d.recommendations.length > 0);
+  if (hasBPRecs) {
+    plan += '• Home BP log review\n';
+  }
+
+  plan += '\nLong-Term Goals:\n';
   plan += `• BP <${calculations.bpTarget.systolic}/${calculations.bpTarget.diastolic} mmHg sustained\n`;
   plan += `• LDL <${calculations.ldlGoal} mg/dL\n`;
 
@@ -242,6 +259,152 @@ function buildFollowUpPlan(calculations: ClinicalCalculations, domains: any[]): 
   }
 
   return plan;
+}
+
+function determineNextAppointmentTiming(allRecs: any[], calculations: ClinicalCalculations): string {
+  const highPriorityAdds = allRecs.filter(
+    (r) => r.priority === 'HIGH' && (r.action === 'ADD' || r.action === 'INCREASE')
+  );
+
+  // Check for medications requiring close monitoring
+  const hasACEARB = allRecs.some(
+    (r) =>
+      (r.action === 'ADD' || r.action === 'INCREASE') &&
+      (r.medication.toLowerCase().includes('lisinopril') ||
+        r.medication.toLowerCase().includes('losartan') ||
+        r.medication.toLowerCase().includes('enalapril') ||
+        r.medication.toLowerCase().includes('valsartan'))
+  );
+
+  const hasMultipleBPMeds = allRecs.filter(
+    (r) =>
+      (r.action === 'ADD' || r.action === 'INCREASE') &&
+      (r.medication.toLowerCase().includes('amlodipine') ||
+        r.medication.toLowerCase().includes('chlorthalidone') ||
+        r.medication.toLowerCase().includes('hydrochlorothiazide') ||
+        r.medication.toLowerCase().includes('lisinopril') ||
+        r.medication.toLowerCase().includes('losartan'))
+  ).length >= 2;
+
+  const isStage2HTN = calculations.bpClassification === 'Stage 2 Hypertension';
+
+  // 1-2 weeks: Stage 2 HTN with multiple new BP meds, or ACE-I/ARB needing safety check
+  if ((isStage2HTN && hasMultipleBPMeds) || (hasACEARB && highPriorityAdds.length >= 2)) {
+    return '1-2 weeks';
+  }
+
+  // 2 weeks: ACE-I/ARB initiation (safety labs)
+  if (hasACEARB) {
+    return '2 weeks';
+  }
+
+  // 2-4 weeks: Multiple high priority changes
+  if (highPriorityAdds.length >= 3) {
+    return '2-4 weeks';
+  }
+
+  // 4 weeks: Moderate changes or fewer high priority items
+  if (highPriorityAdds.length >= 1 || allRecs.some((r) => r.action === 'ADD')) {
+    return '4 weeks';
+  }
+
+  // 6-8 weeks: Minor changes only
+  return '6-8 weeks';
+}
+
+function buildNextVisitFocus(allRecs: any[], calculations: ClinicalCalculations): string[] {
+  const focus: string[] = [];
+
+  // Lab review if safety labs needed
+  const hasACEARB = allRecs.some(
+    (r) =>
+      (r.action === 'ADD' || r.action === 'INCREASE') &&
+      (r.medication.toLowerCase().includes('lisinopril') || r.medication.toLowerCase().includes('losartan'))
+  );
+
+  if (hasACEARB) {
+    focus.push('review BMP results (K+, Cr after ACE-I/ARB initiation)');
+  }
+
+  // Specific new medications with side effects
+  const newMeds: string[] = [];
+  const sideEffects: string[] = [];
+
+  allRecs
+    .filter((r) => r.action === 'ADD' || r.action === 'INCREASE')
+    .forEach((r) => {
+      const medLower = r.medication.toLowerCase();
+      if (medLower.includes('lisinopril') || medLower.includes('losartan')) {
+        if (!newMeds.includes('ACE-I/ARB')) {
+          newMeds.push('ACE-I/ARB');
+          sideEffects.push('dry cough, dizziness, hyperkalemia');
+        }
+      } else if (medLower.includes('amlodipine')) {
+        newMeds.push('amlodipine');
+        sideEffects.push('peripheral edema');
+      } else if (medLower.includes('chlorthalidone') || medLower.includes('hydrochlorothiazide')) {
+        newMeds.push('thiazide diuretic');
+        sideEffects.push('hypokalemia, nocturia');
+      } else if (medLower.includes('statin')) {
+        newMeds.push('statin');
+        sideEffects.push('muscle pain, elevated liver enzymes');
+      } else if (medLower.includes('metformin')) {
+        newMeds.push('metformin');
+        sideEffects.push('GI upset, nausea');
+      } else if (medLower.includes('empagliflozin') || medLower.includes('dapagliflozin')) {
+        newMeds.push('SGLT2 inhibitor');
+        sideEffects.push('genital mycotic infections, polyuria');
+      }
+    });
+
+  if (sideEffects.length > 0) {
+    focus.push(`assess for medication side effects (${sideEffects.join('; ')})`);
+  }
+
+  // BP control
+  const hasBPRecs = allRecs.some((r) => r.medication.toLowerCase().includes('amlodipine') || r.medication.toLowerCase().includes('lisinopril'));
+  if (hasBPRecs) {
+    focus.push('check home BP log');
+  }
+
+  // General adherence
+  focus.push('assess medication tolerability');
+
+  return focus;
+}
+
+function buildThreeMonthFocus(allRecs: any[], calculations: ClinicalCalculations): string[] {
+  const focus: string[] = [];
+
+  // Statin follow-up
+  const hasStatin = allRecs.some((r) => r.medication.toLowerCase().includes('statin'));
+  if (hasStatin) {
+    focus.push('review lipid panel and A1c');
+  }
+
+  // Diabetes management
+  const hasDiabetesMeds = allRecs.some(
+    (r) => r.medication.toLowerCase().includes('metformin') || r.medication.toLowerCase().includes('empagliflozin')
+  );
+  if (hasDiabetesMeds && !hasStatin) {
+    focus.push('review A1c');
+  }
+
+  // BP reassessment
+  const hasBPMeds = allRecs.some((r) => r.medication.toLowerCase().includes('amlodipine') || r.medication.toLowerCase().includes('lisinopril'));
+  if (hasBPMeds) {
+    focus.push('reassess BP control');
+  }
+
+  // Smoking status
+  const hasSmokingRec = allRecs.some(
+    (r) => r.medication.toLowerCase().includes('smoking') || r.rationale.toLowerCase().includes('smoking')
+  );
+  if (hasSmokingRec) {
+    focus.push('smoking status');
+  }
+
+  return focus;
 }
 
 function compileReferences(domains: any[]): string {
