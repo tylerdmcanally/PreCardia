@@ -299,10 +299,6 @@ function App() {
       : [];
 
     useEffect(() => {
-      setSearchTerm(value);
-    }, [value]);
-
-    useEffect(() => {
       const handleClickOutside = (event: MouseEvent) => {
         if (
           dropdownRef.current &&
@@ -349,7 +345,6 @@ function App() {
           value={searchTerm}
           onChange={(e) => {
             setSearchTerm(e.target.value);
-            onSelect(e.target.value);
             setShowSuggestions(true);
             setSelectedIndex(-1);
           }}
