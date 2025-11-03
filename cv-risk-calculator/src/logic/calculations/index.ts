@@ -2,7 +2,7 @@ import { PatientData, ClinicalCalculations } from '../../types';
 import { calculateBMI } from './bmi';
 import { calculateEGFR, stageCKD } from './egfr';
 import { calculateAverageBP, classifyBloodPressure, determineBPTarget } from './bpClassification';
-import { calculatePREVENTRisk, categorizePREVENTRisk } from './prevent';
+import { calculateAllPREVENTRisks, categorizePREVENTRisk } from './prevent';
 import { calculateCHA2DS2VASc, interpretCHA2DS2VASc } from './cha2ds2vasc';
 
 export function performClinicalCalculations(patientData: PatientData): ClinicalCalculations {
@@ -21,10 +21,10 @@ export function performClinicalCalculations(patientData: PatientData): ClinicalC
   const averageBP = calculateAverageBP(bpReadings);
   const bpClassification = classifyBloodPressure(averageBP.systolic, averageBP.diastolic);
 
-  // PREVENT 10-year Total CVD Risk (replaces Pooled Cohort ASCVD)
+  // PREVENT 10-year CVD Risks (Total CVD, ASCVD, Heart Failure, CAD, Stroke)
   const hasMinimalLabsForPREVENT = labs.totalCholesterol && labs.hdl && averageBP.systolic > 0 && bmi > 0 && egfr > 0;
-  const ascvdRisk = hasMinimalLabsForPREVENT
-    ? calculatePREVENTRisk({
+  const preventRisks = hasMinimalLabsForPREVENT
+    ? calculateAllPREVENTRisks({
         age: demographics.age,
         sex: demographics.sex,
         totalCholesterol: labs.totalCholesterol!,
@@ -41,8 +41,9 @@ export function performClinicalCalculations(patientData: PatientData): ClinicalC
         egfr,
         onStatin: patientData.medications.some((m) => m.category === 'Statin'),
       })
-    : 0;
+    : { totalCVD: 0, ascvd: 0, heartFailure: 0, cad: 0, stroke: 0 };
 
+  const ascvdRisk = preventRisks.totalCVD; // Backward compatibility
   const ascvdCategory = categorizePREVENTRisk(ascvdRisk);
 
   // Determine targets
@@ -124,6 +125,7 @@ export function performClinicalCalculations(patientData: PatientData): ClinicalC
     averageBP,
     bpClassification,
     bpTarget,
+    preventRisks,
     ascvdRisk,
     ascvdCategory,
     ckdStage,

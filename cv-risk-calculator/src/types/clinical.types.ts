@@ -4,7 +4,14 @@ export interface ClinicalCalculations {
   averageBP: { systolic: number; diastolic: number };
   bpClassification: BPClassification;
   bpTarget: { systolic: number; diastolic: number; rationale: string };
-  ascvdRisk: number;
+  preventRisks: {
+    totalCVD: number;
+    ascvd: number;
+    heartFailure: number;
+    cad: number;
+    stroke: number;
+  };
+  ascvdRisk: number; // Kept for backward compatibility - equals preventRisks.totalCVD
   ascvdCategory: 'low' | 'borderline' | 'intermediate' | 'high';
   ckdStage: number;
   ldlGoal: number;

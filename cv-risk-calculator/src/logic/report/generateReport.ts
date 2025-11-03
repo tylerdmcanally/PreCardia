@@ -58,12 +58,17 @@ Generated: ${new Date().toLocaleDateString()}`;
 
 function buildRiskProfile(patientData: PatientData, calculations: ClinicalCalculations): string {
   const { history, labs } = patientData;
-  const { averageBP, bpClassification, ascvdRisk, ascvdCategory, egfr, ckdStage } = calculations;
+  const { averageBP, bpClassification, preventRisks, ascvdCategory, egfr, ckdStage } = calculations;
 
   let profile = `BP: ${averageBP.systolic}/${averageBP.diastolic} mmHg (${bpClassification}) | Target: <${calculations.bpTarget.systolic}/${calculations.bpTarget.diastolic}\n`;
 
-  if (ascvdRisk > 0) {
-    profile += `ASCVD 10-Year Risk: ${ascvdRisk.toFixed(1)}% (${capitalize(ascvdCategory)} Risk)\n`;
+  if (preventRisks.totalCVD > 0) {
+    profile += `\n10-YEAR PREVENT CARDIOVASCULAR RISKS:\n`;
+    profile += `  Total CVD Risk: ${preventRisks.totalCVD.toFixed(1)}% (${capitalize(ascvdCategory)})\n`;
+    profile += `  ASCVD Risk: ${preventRisks.ascvd.toFixed(1)}%\n`;
+    profile += `  Heart Failure Risk: ${preventRisks.heartFailure.toFixed(1)}%\n`;
+    profile += `  CAD Risk: ${preventRisks.cad.toFixed(1)}%\n`;
+    profile += `  Stroke Risk: ${preventRisks.stroke.toFixed(1)}%\n`;
   }
 
   if (egfr > 0) {
