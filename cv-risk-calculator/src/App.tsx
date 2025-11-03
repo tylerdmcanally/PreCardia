@@ -922,7 +922,7 @@ function App() {
                               onChange={(e) => updateAllergy(allergy.id, 'reaction', e.target.value)}
                               className="flex-1 px-2 py-2 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-lime focus:border-primary-lime bg-white min-w-0"
                             >
-                              <option value="">Reaction</option>
+                              <option value="">Select reaction...</option>
                               <option value="Anaphylaxis">Anaphylaxis</option>
                               <option value="Angioedema">Angioedema</option>
                               <option value="Hives">Hives</option>
