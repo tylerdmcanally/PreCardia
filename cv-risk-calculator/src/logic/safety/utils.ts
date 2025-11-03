@@ -174,3 +174,34 @@ export function getNSAIDMedications(medications: Medication[]): Medication[] {
     return NSAID_KEYWORDS.some((keyword) => generic.includes(keyword));
   });
 }
+
+export const QT_PROLONGING_KEYWORDS = [
+  'diltiazem',
+  'verapamil',
+  'digoxin',
+  'ranolazine'
+];
+
+export function getQTMedications(medications: Medication[]): Medication[] {
+  return medications.filter((medication) => {
+    const generic = normalize(medication.genericName);
+    return QT_PROLONGING_KEYWORDS.some((keyword) => generic.includes(keyword));
+  });
+}
+
+export const DIURETIC_KEYWORDS = [
+  'furosemide',
+  'bumetanide',
+  'torsemide',
+  'hydrochlorothiazide',
+  'chlorthalidone',
+  'indapamide',
+  'metolazone'
+];
+
+export function getDiureticMedications(medications: Medication[]): Medication[] {
+  return medications.filter((medication) => {
+    const generic = normalize(medication.genericName);
+    return DIURETIC_KEYWORDS.some((keyword) => generic.includes(keyword));
+  });
+}
