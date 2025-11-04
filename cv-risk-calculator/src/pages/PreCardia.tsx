@@ -111,7 +111,7 @@ export function PreCardia() {
   const [antiplatelet, setAntiplatelet] = useState(false);
 
   // Functional capacity
-  const [useDASI, setUseDASI] = useState(false);
+  const [useDASI, setUseDASI] = useState(true);
   const [functionalCapacity, setFunctionalCapacity] = useState<FunctionalCapacityOption>('unknown');
   const [dasi1, setDasi1] = useState(false);
   const [dasi2, setDasi2] = useState(false);
@@ -1273,25 +1273,67 @@ export function PreCardia() {
                   <label className="flex items-center cursor-pointer">
                     <input
                       type="radio"
-                      checked={!useDASI}
-                      onChange={() => setUseDASI(false)}
-                      className="mr-2"
-                    />
-                    <span>Clinical Assessment</span>
-                  </label>
-                  <label className="flex items-center cursor-pointer">
-                    <input
-                      type="radio"
                       checked={useDASI}
                       onChange={() => setUseDASI(true)}
                       className="mr-2"
                     />
                     <span>DASI Questionnaire</span>
                   </label>
+                  <label className="flex items-center cursor-pointer">
+                    <input
+                      type="radio"
+                      checked={!useDASI}
+                      onChange={() => setUseDASI(false)}
+                      className="mr-2"
+                    />
+                    <span>Clinical Assessment</span>
+                  </label>
                 </div>
               </div>
 
-              {!useDASI ? (
+              {useDASI ? (
+                <div className="space-y-4">
+                  <p className="text-sm text-gray-600 font-medium">Can the patient perform the following activities?</p>
+
+                  {/* Toggle Switch Component */}
+                  {[
+                    { state: dasi1, setState: setDasi1, label: 'Personal care (eating, dressing, bathing)' },
+                    { state: dasi2, setState: setDasi2, label: 'Walking indoors' },
+                    { state: dasi3, setState: setDasi3, label: 'Walking 1-2 blocks on level ground' },
+                    { state: dasi4, setState: setDasi4, label: 'Climbing one flight of stairs or walking uphill' },
+                    { state: dasi5, setState: setDasi5, label: 'Running a short distance' },
+                    { state: dasi6, setState: setDasi6, label: 'Light housework (dusting, washing dishes)' },
+                    { state: dasi7, setState: setDasi7, label: 'Moderate housework (vacuuming, sweeping)' },
+                    { state: dasi8, setState: setDasi8, label: 'Heavy housework (scrubbing floors, lifting furniture)' },
+                    { state: dasi9, setState: setDasi9, label: 'Yard work (raking leaves, mowing lawn)' },
+                    { state: dasi10, setState: setDasi10, label: 'Sexual relations' },
+                    { state: dasi11, setState: setDasi11, label: 'Participating in moderate recreational activities (golf, dancing, tennis)' },
+                    { state: dasi12, setState: setDasi12, label: 'Participating in strenuous sports (swimming, jogging, football)' }
+                  ].map(({ state, setState, label }, index) => (
+                    <div key={index} className="flex items-center justify-between p-3 bg-cardio-bg/30 rounded-lg border border-cardio-border">
+                      <span className="text-sm text-gray-700 flex-1 pr-4">{label}</span>
+                      <button
+                        type="button"
+                        onClick={() => setState(!state)}
+                        className={`relative inline-flex h-7 w-14 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-cardio-secondary focus:ring-offset-2 ${
+                          state ? 'bg-cardio-secondary' : 'bg-gray-300'
+                        }`}
+                        role="switch"
+                        aria-checked={state}
+                      >
+                        <span
+                          className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
+                            state ? 'translate-x-8' : 'translate-x-1'
+                          }`}
+                        />
+                      </button>
+                      <span className={`ml-3 text-sm font-semibold w-10 text-right ${state ? 'text-cardio-secondary' : 'text-gray-400'}`}>
+                        {state ? 'YES' : 'NO'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
                 <div>
                   <label className="block text-sm font-semibold text-cardio-primary mb-2">
                     Functional Capacity (METs)
@@ -1307,59 +1349,6 @@ export function PreCardia() {
                     <option value="poor">Poor (&lt;4 METs) - Cannot walk one flight of stairs</option>
                     <option value="unknown">Unknown / Unable to assess</option>
                   </select>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <p className="text-sm text-gray-600">Check all activities the patient can perform:</p>
-
-                  <label className="flex items-start cursor-pointer">
-                    <input type="checkbox" checked={dasi1} onChange={(e) => setDasi1(e.target.checked)} className="mt-1 mr-3" />
-                    <span>Personal care (eating, dressing, bathing)</span>
-                  </label>
-                  <label className="flex items-start cursor-pointer">
-                    <input type="checkbox" checked={dasi2} onChange={(e) => setDasi2(e.target.checked)} className="mt-1 mr-3" />
-                    <span>Walking indoors</span>
-                  </label>
-                  <label className="flex items-start cursor-pointer">
-                    <input type="checkbox" checked={dasi3} onChange={(e) => setDasi3(e.target.checked)} className="mt-1 mr-3" />
-                    <span>Walking 1-2 blocks on level ground</span>
-                  </label>
-                  <label className="flex items-start cursor-pointer">
-                    <input type="checkbox" checked={dasi4} onChange={(e) => setDasi4(e.target.checked)} className="mt-1 mr-3" />
-                    <span>Climbing one flight of stairs or walking uphill</span>
-                  </label>
-                  <label className="flex items-start cursor-pointer">
-                    <input type="checkbox" checked={dasi5} onChange={(e) => setDasi5(e.target.checked)} className="mt-1 mr-3" />
-                    <span>Running a short distance</span>
-                  </label>
-                  <label className="flex items-start cursor-pointer">
-                    <input type="checkbox" checked={dasi6} onChange={(e) => setDasi6(e.target.checked)} className="mt-1 mr-3" />
-                    <span>Light housework (dusting, washing dishes)</span>
-                  </label>
-                  <label className="flex items-start cursor-pointer">
-                    <input type="checkbox" checked={dasi7} onChange={(e) => setDasi7(e.target.checked)} className="mt-1 mr-3" />
-                    <span>Moderate housework (vacuuming, sweeping)</span>
-                  </label>
-                  <label className="flex items-start cursor-pointer">
-                    <input type="checkbox" checked={dasi8} onChange={(e) => setDasi8(e.target.checked)} className="mt-1 mr-3" />
-                    <span>Heavy housework (scrubbing floors, lifting furniture)</span>
-                  </label>
-                  <label className="flex items-start cursor-pointer">
-                    <input type="checkbox" checked={dasi9} onChange={(e) => setDasi9(e.target.checked)} className="mt-1 mr-3" />
-                    <span>Yard work (raking leaves, mowing lawn)</span>
-                  </label>
-                  <label className="flex items-start cursor-pointer">
-                    <input type="checkbox" checked={dasi10} onChange={(e) => setDasi10(e.target.checked)} className="mt-1 mr-3" />
-                    <span>Sexual relations</span>
-                  </label>
-                  <label className="flex items-start cursor-pointer">
-                    <input type="checkbox" checked={dasi11} onChange={(e) => setDasi11(e.target.checked)} className="mt-1 mr-3" />
-                    <span>Participating in moderate recreational activities (golf, dancing, tennis)</span>
-                  </label>
-                  <label className="flex items-start cursor-pointer">
-                    <input type="checkbox" checked={dasi12} onChange={(e) => setDasi12(e.target.checked)} className="mt-1 mr-3" />
-                    <span>Participating in strenuous sports (swimming, jogging, football)</span>
-                  </label>
                 </div>
               )}
             </div>
