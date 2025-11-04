@@ -867,175 +867,200 @@ export function PreCardia() {
           </button>
 
           {expandedSections.has('interventions') && (
-            <div className="px-6 pb-6 space-y-4">
-              <div>
-                <label className="block text-sm font-semibold text-cardio-primary mb-2">
+            <div className="px-6 pb-6 space-y-6">
+              {/* Recent MI */}
+              <div className="space-y-3">
+                <h3 className="text-lg font-semibold text-cardio-primary border-b border-cardio-border pb-2">
                   Recent MI
-                </label>
-                <select
-                  value={recentMI}
-                  onChange={(e) => setRecentMI(e.target.value as 'yes' | 'no')}
-                  className="w-full px-3 py-2 border-2 border-cardio-border rounded focus:border-cardio-secondary focus:outline-none"
-                >
-                  <option value="no">No</option>
-                  <option value="yes">Yes</option>
-                </select>
-              </div>
-
-              {recentMI === 'yes' && (
+                </h3>
                 <div>
-                  <label className="block text-sm font-semibold text-cardio-primary mb-2">
-                    MI Timing
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Has patient had a recent MI?
                   </label>
                   <select
-                    value={miTiming}
-                    onChange={(e) => setMiTiming(e.target.value as MiTimingOption)}
+                    value={recentMI}
+                    onChange={(e) => setRecentMI(e.target.value as 'yes' | 'no')}
                     className="w-full px-3 py-2 border-2 border-cardio-border rounded focus:border-cardio-secondary focus:outline-none"
                   >
-                    <option value="">Select...</option>
-                    <option value="lt4w">&lt;4 weeks</option>
-                    <option value="4to8w">4-8 weeks</option>
-                    <option value="gt8w">&gt;8 weeks</option>
-                    <option value="unknown">Unknown</option>
+                    <option value="no">No</option>
+                    <option value="yes">Yes</option>
                   </select>
                 </div>
-              )}
+                {recentMI === 'yes' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      MI Timing
+                    </label>
+                    <select
+                      value={miTiming}
+                      onChange={(e) => setMiTiming(e.target.value as MiTimingOption)}
+                      className="w-full px-3 py-2 border-2 border-cardio-border rounded focus:border-cardio-secondary focus:outline-none"
+                    >
+                      <option value="">Select...</option>
+                      <option value="lt4w">&lt;4 weeks</option>
+                      <option value="4to8w">4-8 weeks</option>
+                      <option value="gt8w">&gt;8 weeks</option>
+                      <option value="unknown">Unknown</option>
+                    </select>
+                  </div>
+                )}
+              </div>
 
-              <div>
-                <label className="block text-sm font-semibold text-cardio-primary mb-2">
+              {/* Coronary Stent */}
+              <div className="space-y-3">
+                <h3 className="text-lg font-semibold text-cardio-primary border-b border-cardio-border pb-2">
                   Coronary Stent
-                </label>
-                <select
-                  value={stentType}
-                  onChange={(e) => setStentType(e.target.value as StentTypeOption)}
-                  className="w-full px-3 py-2 border-2 border-cardio-border rounded focus:border-cardio-secondary focus:outline-none"
-                >
-                  <option value="">No stent</option>
-                  <option value="bms">Bare-metal stent (BMS)</option>
-                  <option value="des">Drug-eluting stent (DES)</option>
-                </select>
-              </div>
-
-              {stentType && stentType !== 'none' && (
+                </h3>
                 <div>
-                  <label className="block text-sm font-semibold text-cardio-primary mb-2">
-                    Stent Timing
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Stent type
                   </label>
                   <select
-                    value={stentTiming}
-                    onChange={(e) => setStentTiming(e.target.value as StentTimingOption)}
+                    value={stentType}
+                    onChange={(e) => setStentType(e.target.value as StentTypeOption)}
                     className="w-full px-3 py-2 border-2 border-cardio-border rounded focus:border-cardio-secondary focus:outline-none"
                   >
-                    <option value="">Select...</option>
-                    <option value="lt2w">&lt;2 weeks</option>
-                    <option value="2to4w">2-4 weeks</option>
-                    <option value="4to12w">4-12 weeks</option>
-                    <option value="gt12w">&gt;12 weeks</option>
+                    <option value="">No stent</option>
+                    <option value="bms">Bare-metal stent (BMS)</option>
+                    <option value="des">Drug-eluting stent (DES)</option>
                   </select>
                 </div>
-              )}
+                {stentType && stentType !== 'none' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Stent Timing
+                    </label>
+                    <select
+                      value={stentTiming}
+                      onChange={(e) => setStentTiming(e.target.value as StentTimingOption)}
+                      className="w-full px-3 py-2 border-2 border-cardio-border rounded focus:border-cardio-secondary focus:outline-none"
+                    >
+                      <option value="">Select...</option>
+                      <option value="lt2w">&lt;2 weeks</option>
+                      <option value="2to4w">2-4 weeks</option>
+                      <option value="4to12w">4-12 weeks</option>
+                      <option value="gt12w">&gt;12 weeks</option>
+                    </select>
+                  </div>
+                )}
+              </div>
 
-              <div>
-                <label className="block text-sm font-semibold text-cardio-primary mb-2">
+              {/* CABG */}
+              <div className="space-y-3">
+                <h3 className="text-lg font-semibold text-cardio-primary border-b border-cardio-border pb-2">
                   CABG
-                </label>
-                <select
-                  value={cabg}
-                  onChange={(e) => setCabg(e.target.value as 'yes' | 'no')}
-                  className="w-full px-3 py-2 border-2 border-cardio-border rounded focus:border-cardio-secondary focus:outline-none"
-                >
-                  <option value="no">No</option>
-                  <option value="yes">Yes</option>
-                </select>
-              </div>
-
-              {cabg === 'yes' && (
+                </h3>
                 <div>
-                  <label className="block text-sm font-semibold text-cardio-primary mb-2">
-                    CABG Timing
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Has patient had CABG?
                   </label>
                   <select
-                    value={cabgTiming}
-                    onChange={(e) => setCabgTiming(e.target.value as CabgTimingOption)}
+                    value={cabg}
+                    onChange={(e) => setCabg(e.target.value as 'yes' | 'no')}
                     className="w-full px-3 py-2 border-2 border-cardio-border rounded focus:border-cardio-secondary focus:outline-none"
                   >
-                    <option value="">Select...</option>
-                    <option value="lt6w">&lt;6 weeks</option>
-                    <option value="6wto3mo">6 weeks to 3 months</option>
-                    <option value="gt3mo">&gt;3 months</option>
+                    <option value="no">No</option>
+                    <option value="yes">Yes</option>
                   </select>
                 </div>
-              )}
-
-              <div>
-                <label className="block text-sm font-semibold text-cardio-primary mb-2">
-                  TAVR/TAVI in Past Year
-                </label>
-                <select
-                  value={tavrTavi}
-                  onChange={(e) => setTavrTavi(e.target.value as 'yes' | 'no')}
-                  className="w-full px-3 py-2 border-2 border-cardio-border rounded focus:border-cardio-secondary focus:outline-none"
-                >
-                  <option value="no">No</option>
-                  <option value="yes">Yes</option>
-                </select>
+                {cabg === 'yes' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      CABG Timing
+                    </label>
+                    <select
+                      value={cabgTiming}
+                      onChange={(e) => setCabgTiming(e.target.value as CabgTimingOption)}
+                      className="w-full px-3 py-2 border-2 border-cardio-border rounded focus:border-cardio-secondary focus:outline-none"
+                    >
+                      <option value="">Select...</option>
+                      <option value="lt6w">&lt;6 weeks</option>
+                      <option value="6wto3mo">6 weeks to 3 months</option>
+                      <option value="gt3mo">&gt;3 months</option>
+                    </select>
+                  </div>
+                )}
               </div>
 
-              {tavrTavi === 'yes' && (
+              {/* TAVR/TAVI */}
+              <div className="space-y-3">
+                <h3 className="text-lg font-semibold text-cardio-primary border-b border-cardio-border pb-2">
+                  TAVR/TAVI
+                </h3>
                 <div>
-                  <label className="block text-sm font-semibold text-cardio-primary mb-2">
-                    TAVR/TAVI Timing
-                  </label>
-                <select
-                  value={tavrTiming}
-                  onChange={(e) => setTavrTiming(e.target.value as TavrTimingOption)}
-                    className="w-full px-3 py-2 border-2 border-cardio-border rounded focus:border-cardio-secondary focus:outline-none"
-                  >
-                    <option value="">Select...</option>
-                    <option value="lt4w">&lt;4 weeks</option>
-                    <option value="gt4w">&gt;4 weeks</option>
-                    <option value="unknown">Unknown</option>
-                  </select>
-                </div>
-              )}
-
-              <div>
-                <label className="block text-sm font-semibold text-cardio-primary mb-2">
-                  TEER / MitraClip in Past Year
-                </label>
-                <select
-                  value={teer}
-                  onChange={(e) => {
-                    const value = e.target.value as 'yes' | 'no';
-                    setTeer(value);
-                    if (value === 'no') {
-                      setTeerTiming('');
-                    }
-                  }}
-                  className="w-full px-3 py-2 border-2 border-cardio-border rounded focus:border-cardio-secondary focus:outline-none"
-                >
-                  <option value="no">No</option>
-                  <option value="yes">Yes</option>
-                </select>
-              </div>
-
-              {teer === 'yes' && (
-                <div>
-                  <label className="block text-sm font-semibold text-cardio-primary mb-2">
-                    TEER Timing
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    TAVR/TAVI in Past Year?
                   </label>
                   <select
-                    value={teerTiming}
-                    onChange={(e) => setTeerTiming(e.target.value as TeerTimingOption)}
+                    value={tavrTavi}
+                    onChange={(e) => setTavrTavi(e.target.value as 'yes' | 'no')}
                     className="w-full px-3 py-2 border-2 border-cardio-border rounded focus:border-cardio-secondary focus:outline-none"
                   >
-                    <option value="">Select...</option>
-                    <option value="lt4w">&lt;4 weeks</option>
-                    <option value="gt4w">&gt;4 weeks</option>
-                    <option value="unknown">Unknown</option>
+                    <option value="no">No</option>
+                    <option value="yes">Yes</option>
                   </select>
                 </div>
-              )}
+                {tavrTavi === 'yes' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      TAVR/TAVI Timing
+                    </label>
+                    <select
+                      value={tavrTiming}
+                      onChange={(e) => setTavrTiming(e.target.value as TavrTimingOption)}
+                      className="w-full px-3 py-2 border-2 border-cardio-border rounded focus:border-cardio-secondary focus:outline-none"
+                    >
+                      <option value="">Select...</option>
+                      <option value="lt4w">&lt;4 weeks</option>
+                      <option value="gt4w">&gt;4 weeks</option>
+                      <option value="unknown">Unknown</option>
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              {/* TEER / MitraClip */}
+              <div className="space-y-3">
+                <h3 className="text-lg font-semibold text-cardio-primary border-b border-cardio-border pb-2">
+                  TEER / MitraClip
+                </h3>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    TEER / MitraClip in Past Year?
+                  </label>
+                  <select
+                    value={teer}
+                    onChange={(e) => {
+                      const value = e.target.value as 'yes' | 'no';
+                      setTeer(value);
+                      if (value === 'no') {
+                        setTeerTiming('');
+                      }
+                    }}
+                    className="w-full px-3 py-2 border-2 border-cardio-border rounded focus:border-cardio-secondary focus:outline-none"
+                  >
+                    <option value="no">No</option>
+                    <option value="yes">Yes</option>
+                  </select>
+                </div>
+                {teer === 'yes' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      TEER Timing
+                    </label>
+                    <select
+                      value={teerTiming}
+                      onChange={(e) => setTeerTiming(e.target.value as TeerTimingOption)}
+                      className="w-full px-3 py-2 border-2 border-cardio-border rounded focus:border-cardio-secondary focus:outline-none"
+                    >
+                      <option value="">Select...</option>
+                      <option value="lt4w">&lt;4 weeks</option>
+                      <option value="gt4w">&gt;4 weeks</option>
+                      <option value="unknown">Unknown</option>
+                    </select>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </section>
