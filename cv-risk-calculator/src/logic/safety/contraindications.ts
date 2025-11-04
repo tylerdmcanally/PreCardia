@@ -1,4 +1,4 @@
-import { PatientData, ClinicalCalculations, DomainRecommendation } from '../../types';
+import { PatientData, ClinicalCalculations } from '../../types';
 import { GUIDELINES } from '../../data/guidelines';
 import { SafetyCheckResult } from '../../types';
 import {

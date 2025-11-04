@@ -1,4 +1,4 @@
-import { PatientData, ClinicalCalculations } from '../../types';
+import { PatientData } from '../../types';
 import { GUIDELINES } from '../../data/guidelines';
 import { SafetyCheckResult } from '../../types';
 import {
@@ -14,7 +14,6 @@ import {
 
 export function getInteractionAlerts(
   patientData: PatientData,
-  _calculations: ClinicalCalculations
 ): SafetyCheckResult[] {
   const alerts: SafetyCheckResult[] = [];
   const medications = patientData.medications;

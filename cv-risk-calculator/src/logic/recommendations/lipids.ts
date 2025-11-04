@@ -58,7 +58,6 @@ export function generateLipidRecommendations(
 
   // HIGH PRIORITY: Upgrade to high-intensity if on moderate
   if (hasASCVD && currentStatin && !isHighIntensity) {
-    const isAtorvastatin = currentStatin.genericName.toLowerCase().includes('atorvastatin');
     const isRosuvastatin = currentStatin.genericName.toLowerCase().includes('rosuvastatin');
 
     let newDose = '40mg daily';

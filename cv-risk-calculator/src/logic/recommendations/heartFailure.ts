@@ -21,7 +21,6 @@ export function generateHeartFailureRecommendations(
   const ejectionFraction = history.ejectionFraction || 0;
   const isHFrEF = ejectionFraction > 0 && ejectionFraction <= 40;
   const isHFmrEF = ejectionFraction > 40 && ejectionFraction <= 49;
-  const isHFpEF = ejectionFraction >= 50;
 
   // Check current medications
   const hasACEI = medications.some((m) => m.category === 'ACE Inhibitor');

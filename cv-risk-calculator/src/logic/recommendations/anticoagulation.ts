@@ -142,7 +142,6 @@ export function generateAnticoagulationRecommendations(
     );
 
     const onTripleTherapy = hasAnticoagulant && hasAspirin && hasP2Y12;
-    const onDualTherapy = hasAnticoagulant && (hasAspirin || hasP2Y12) && !(hasAspirin && hasP2Y12);
     const onDAPT = !hasAnticoagulant && hasAspirin && hasP2Y12;
     const onMultipleAntithrombotics = (hasAnticoagulant && (hasAspirin || hasP2Y12)) || onDAPT;
 

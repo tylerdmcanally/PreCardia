@@ -1,4 +1,4 @@
-import { PatientData, ClinicalCalculations, DomainRecommendation, Medication } from '../../types';
+import { PatientData, ClinicalCalculations, DomainRecommendation, Medication, LabValues } from '../../types';
 import { GUIDELINES } from '../../data/guidelines';
 import { getSafetyRecommendationsForDomain, hasAllergyToAnyCategory, hasRAASSafetyHold } from '../safety';
 
@@ -182,13 +182,13 @@ export function generateBPRecommendations(
 
 function canTitrateBPMed(
   med: Medication,
-  labs: any,
+  labs: LabValues,
   egfr: number
 ): { possible: boolean; newDose: string; monitoring?: string } {
   const genericLower = med.genericName.toLowerCase();
 
   if (genericLower.includes('lisinopril')) {
-    const currentDose = parseInt(med.dose);
+    const currentDose = parseInt(med.dose, 10);
     if (currentDose < 40 && (!labs.potassium || labs.potassium < 5.5) && egfr > 30) {
       return {
         possible: true,
@@ -209,7 +209,7 @@ function canTitrateBPMed(
   }
 
   if (genericLower.includes('losartan')) {
-    const currentDose = parseInt(med.dose);
+    const currentDose = parseInt(med.dose, 10);
     if (currentDose < 100 && (!labs.potassium || labs.potassium < 5.5) && egfr > 30) {
       return {
         possible: true,

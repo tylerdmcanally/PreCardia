@@ -1,4 +1,4 @@
-import { PatientData, ClinicalCalculations, ClinicalReport, MedicationReview, Medication, ClinicalDomain } from '../../types';
+import { PatientData, ClinicalCalculations, ClinicalReport, MedicationReview, Medication, ClinicalDomain, DomainRecommendation } from '../../types';
 import { generateAllDomainRecommendations } from '../recommendations';
 import { buildMonitoringPlan } from './monitoringPlan';
 import { GUIDELINE_REFERENCES, KEY_TRIALS } from '../../data/guidelines';
@@ -62,13 +62,19 @@ function buildRiskProfile(patientData: PatientData, calculations: ClinicalCalcul
 
   let profile = `BP: ${averageBP.systolic}/${averageBP.diastolic} mmHg (${bpClassification}) | Target: <${calculations.bpTarget.systolic}/${calculations.bpTarget.diastolic}\n`;
 
-  if (preventRisks.totalCVD > 0) {
+  if (preventRisks.totalCVD_10yr && preventRisks.totalCVD_10yr > 0) {
     profile += `\n10-YEAR PREVENT CARDIOVASCULAR RISKS:\n`;
-    profile += `  Total CVD Risk: ${preventRisks.totalCVD.toFixed(1)}% (${capitalize(ascvdCategory)})\n`;
-    profile += `  ASCVD Risk: ${preventRisks.ascvd.toFixed(1)}%\n`;
-    profile += `  Heart Failure Risk: ${preventRisks.heartFailure.toFixed(1)}%\n`;
-    profile += `  CAD Risk: ${preventRisks.cad.toFixed(1)}%\n`;
-    profile += `  Stroke Risk: ${preventRisks.stroke.toFixed(1)}%\n`;
+    profile += `  Total CVD Risk: ${preventRisks.totalCVD_10yr.toFixed(1)}% (${capitalize(ascvdCategory)})\n`;
+    profile += `  ASCVD Risk: ${preventRisks.ascvd_10yr?.toFixed(1)}%\n`;
+    profile += `  Heart Failure Risk: ${preventRisks.heartFailure_10yr?.toFixed(1)}%\n`;
+
+    // Show 30-year risks if available (ages 30-59 only)
+    if (preventRisks.totalCVD_30yr !== null) {
+      profile += `\n30-YEAR PREVENT CARDIOVASCULAR RISKS:\n`;
+      profile += `  Total CVD Risk: ${preventRisks.totalCVD_30yr.toFixed(1)}%\n`;
+      profile += `  ASCVD Risk: ${preventRisks.ascvd_30yr?.toFixed(1)}%\n`;
+      profile += `  Heart Failure Risk: ${preventRisks.heartFailure_30yr?.toFixed(1)}%\n`;
+    }
   }
 
   if (egfr > 0) {
@@ -210,20 +216,20 @@ function checkIfNeedsOptimization(
   return false;
 }
 
-function buildFollowUpPlan(calculations: ClinicalCalculations, domains: any[]): string {
-  const allRecs = domains.flatMap((d: any) => d.recommendations);
+function buildFollowUpPlan(calculations: ClinicalCalculations, domains: ClinicalDomain[]): string {
+  const allRecs = domains.flatMap((d) => d.recommendations);
 
   // Determine next appointment timing based on urgency
   const timing = determineNextAppointmentTiming(allRecs, calculations);
 
   // Build specific focus areas based on recommendations
-  const focusAreas = buildNextVisitFocus(allRecs, calculations);
+  const focusAreas = buildNextVisitFocus(allRecs);
 
   let plan = `Next Appointment: ${timing}\n`;
   plan += `Focus: ${focusAreas.join(', ')}\n\n`;
 
   // 3-month follow-up
-  const threeMonthFocus = buildThreeMonthFocus(allRecs, calculations);
+  const threeMonthFocus = buildThreeMonthFocus(allRecs);
   if (threeMonthFocus.length > 0) {
     plan += '3-Month Follow-Up:\n';
     plan += `Focus: ${threeMonthFocus.join(', ')}\n\n`;
@@ -235,13 +241,13 @@ function buildFollowUpPlan(calculations: ClinicalCalculations, domains: any[]): 
   plan += '• Medication adherence and tolerability\n';
 
   const hasSmokingRec = allRecs.some(
-    (r: any) => r.medication.toLowerCase().includes('smoking') || r.rationale.toLowerCase().includes('smoking')
+    (r) => r.medication.toLowerCase().includes('smoking') || r.rationale.toLowerCase().includes('smoking')
   );
   if (hasSmokingRec) {
     plan += '• Smoking cessation progress\n';
   }
 
-  const hasBPRecs = domains.some((d: any) => d.name === 'BLOOD_PRESSURE' && d.recommendations.length > 0);
+  const hasBPRecs = domains.some((d) => d.name === 'BLOOD_PRESSURE' && d.recommendations.length > 0);
   if (hasBPRecs) {
     plan += '• Home BP log review\n';
   }
@@ -261,7 +267,7 @@ function buildFollowUpPlan(calculations: ClinicalCalculations, domains: any[]): 
   return plan;
 }
 
-function determineNextAppointmentTiming(allRecs: any[], calculations: ClinicalCalculations): string {
+function determineNextAppointmentTiming(allRecs: DomainRecommendation[], calculations: ClinicalCalculations): string {
   const highPriorityAdds = allRecs.filter(
     (r) => r.priority === 'HIGH' && (r.action === 'ADD' || r.action === 'INCREASE')
   );
@@ -312,7 +318,7 @@ function determineNextAppointmentTiming(allRecs: any[], calculations: ClinicalCa
   return '6-8 weeks';
 }
 
-function buildNextVisitFocus(allRecs: any[], calculations: ClinicalCalculations): string[] {
+function buildNextVisitFocus(allRecs: DomainRecommendation[]): string[] {
   const focus: string[] = [];
 
   // Lab review if safety labs needed
@@ -373,7 +379,7 @@ function buildNextVisitFocus(allRecs: any[], calculations: ClinicalCalculations)
   return focus;
 }
 
-function buildThreeMonthFocus(allRecs: any[], calculations: ClinicalCalculations): string[] {
+function buildThreeMonthFocus(allRecs: DomainRecommendation[]): string[] {
   const focus: string[] = [];
 
   // Statin follow-up
@@ -407,12 +413,12 @@ function buildThreeMonthFocus(allRecs: any[], calculations: ClinicalCalculations
   return focus;
 }
 
-function compileReferences(domains: any[]): string {
+function compileReferences(domains: ClinicalDomain[]): string {
   const guidelinesUsed = new Set<string>();
   const trialsUsed = new Set<string>();
 
   domains.forEach((domain) => {
-    domain.recommendations.forEach((rec: any) => {
+    domain.recommendations.forEach((rec: DomainRecommendation) => {
       guidelinesUsed.add(rec.evidence);
       if (rec.additionalNotes) {
         if (rec.additionalNotes.includes('EMPA-REG')) trialsUsed.add('EMPA-REG OUTCOME');

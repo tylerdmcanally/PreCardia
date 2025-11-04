@@ -5,13 +5,16 @@ export interface ClinicalCalculations {
   bpClassification: BPClassification;
   bpTarget: { systolic: number; diastolic: number; rationale: string };
   preventRisks: {
-    totalCVD: number;
-    ascvd: number;
-    heartFailure: number;
-    cad: number;
-    stroke: number;
+    // 10-year risks
+    totalCVD_10yr: number | null;
+    ascvd_10yr: number | null;
+    heartFailure_10yr: number | null;
+    // 30-year risks (only for ages 30-59)
+    totalCVD_30yr: number | null;
+    ascvd_30yr: number | null;
+    heartFailure_30yr: number | null;
   };
-  ascvdRisk: number; // Kept for backward compatibility - equals preventRisks.totalCVD
+  ascvdRisk: number; // Kept for backward compatibility - equals preventRisks.totalCVD_10yr || 0
   ascvdCategory: 'low' | 'borderline' | 'intermediate' | 'high';
   ckdStage: number;
   ldlGoal: number;

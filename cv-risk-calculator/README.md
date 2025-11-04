@@ -1,73 +1,139 @@
-# React + TypeScript + Vite
+# CardioTools
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Evidence-based cardiovascular risk assessment and clinical decision support tools built on the latest ACC/AHA guidelines.
 
-Currently, two official plugins are available:
+## Overview
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+CardioTools is a unified web application that provides two comprehensive cardiovascular assessment tools for healthcare providers:
 
-## React Compiler
+### 1. CV Optimization
+- **Based on:** 2024 AHA PREVENT Equations v1.0.0
+- **Purpose:** Calculate cardiovascular disease risk and generate personalized treatment recommendations
+- **Features:**
+  - 10-year and 30-year risk predictions for Total CVD, ASCVD, and Heart Failure
+  - Comprehensive risk factor assessment
+  - Guideline-based treatment recommendations across all cardiovascular domains:
+    - Blood pressure management
+    - Lipid optimization
+    - Diabetes and cardiorenal care
+    - Heart failure treatment
+    - Antiplatelet and anticoagulation therapy
+    - Risk factor modification
+  - EMR-ready clinical reports with copy/print functionality
+  - Drug interaction checking and allergy management
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### 2. PreCardia
+- **Based on:** 2024 ACC/AHA/ACCP/HRS Perioperative Guidelines
+- **Purpose:** Pre-operative cardiac risk assessment for non-cardiac surgery
+- **Features:**
+  - Revised Cardiac Risk Index (RCRI) calculation
+  - 30-day MACE risk stratification
+  - Surgical risk categorization (low/intermediate/high)
+  - Functional capacity assessment (clinical or DASI questionnaire)
+  - Duke Activity Status Index (DASI) with 12-item questionnaire
+  - Active cardiac condition screening
+  - Recent cardiac intervention timing guidance (PCI, CABG, TAVR, MI)
+  - Perioperative testing recommendations (ECG, stress test, echo, biomarkers)
+  - Medication management guidance (beta-blockers, statins, anticoagulants)
+  - Comprehensive pre-operative reports
 
-## Expanding the ESLint configuration
+## Technology Stack
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+- **Frontend:** React 19 with TypeScript
+- **Styling:** Tailwind CSS with unified cardio-* color system
+- **Routing:** React Router v7
+- **Build Tool:** Vite
+- **Icons:** Lucide React
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## Getting Started
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+### Prerequisites
+- Node.js (v18 or higher)
+- npm
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### Installation
+
+```bash
+npm install
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### Development
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm run dev
 ```
+
+The application will be available at `http://localhost:5173/` (or another port if 5173 is in use).
+
+### Building for Production
+
+```bash
+npm run build
+```
+
+The production build will be created in the `dist/` directory.
+
+### Preview Production Build
+
+```bash
+npm run preview
+```
+
+## Project Structure
+
+```
+src/
+├── components/         # Reusable React components
+├── data/              # Clinical data (medications, guidelines)
+├── logic/
+│   ├── calculations/  # Risk calculation engines
+│   │   ├── prevent.ts           # PREVENT equation implementation
+│   │   └── index.ts             # Main calculation orchestrator
+│   ├── precardia/     # PreCardia specific logic
+│   │   ├── constants.ts         # Surgical risk, RCRI data
+│   │   ├── calculations.ts      # RCRI, DASI, eGFR calculations
+│   │   ├── recommendations.ts   # Guideline-based recommendations
+│   │   └── reportGenerator.ts   # Report formatting
+│   ├── report/        # Report generation
+│   └── recommendations/ # Treatment recommendation engines
+├── pages/             # Main application pages
+│   ├── Home.tsx                 # Landing page with tool selector
+│   ├── PreCardia.tsx            # PreCardia assessment tool
+│   └── CVRiskCalculator.tsx     # CV Optimization tool (renamed)
+├── types/             # TypeScript type definitions
+├── App.tsx            # Main routing component
+└── main.tsx           # Application entry point
+```
+
+## Deployment
+
+### Vercel
+This project is configured for deployment on Vercel with the included `vercel.json` configuration.
+
+```bash
+vercel deploy
+```
+
+### Other Platforms
+The production build in the `dist/` directory is a static site that can be deployed to any static hosting service (Netlify, AWS S3, GitHub Pages, etc.).
+
+## Clinical Disclaimer
+
+**IMPORTANT:** These tools are for clinical decision support only and should not replace clinical judgment. Healthcare providers should use these tools in conjunction with their professional expertise and in accordance with local clinical guidelines.
+
+### References
+1. **PREVENT Equations:** Khan SS, et al. Novel Prediction Equations for Absolute Risk Assessment of Total Cardiovascular Disease Incorporating Cardiovascular-Kidney-Metabolic Health. Circulation. 2023.
+2. **Perioperative Guidelines:** Fleisher LA, et al. 2024 ACC/AHA/ACCP/HRS Guideline for Perioperative Cardiovascular Evaluation and Management for Noncardiac Surgery.
+
+## License
+
+This project is for medical education and clinical decision support purposes.
+
+## Version History
+
+### Version 1.0.0
+- Unified CardioTools application launch
+- CV Optimization tool with official AHA PREVENT equations
+- Complete PreCardia pre-operative assessment tool
+- Unified styling and navigation system
+- EMR-ready report generation for both tools

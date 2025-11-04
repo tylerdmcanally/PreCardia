@@ -11,7 +11,7 @@ export function getSafetyRecommendationsForDomain(
 ): DomainRecommendation[] {
   const alerts: SafetyCheckResult[] = [
     ...getContraindicationAlerts(patientData, calculations),
-    ...getInteractionAlerts(patientData, calculations),
+    ...getInteractionAlerts(patientData),
     ...getDoseAdjustmentAlerts(patientData, calculations),
   ];
 

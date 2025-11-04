@@ -21,7 +21,8 @@ export function performClinicalCalculations(patientData: PatientData): ClinicalC
   const averageBP = calculateAverageBP(bpReadings);
   const bpClassification = classifyBloodPressure(averageBP.systolic, averageBP.diastolic);
 
-  // PREVENT 10-year CVD Risks (Total CVD, ASCVD, Heart Failure, CAD, Stroke)
+  // PREVENT CVD Risks (10-year and 30-year for Total CVD, ASCVD, Heart Failure)
+  // Based on official AHA PREVENT equations v1.0.0
   const hasMinimalLabsForPREVENT = labs.totalCholesterol && labs.hdl && averageBP.systolic > 0 && bmi > 0 && egfr > 0;
   const preventRisks = hasMinimalLabsForPREVENT
     ? calculateAllPREVENTRisks({
@@ -41,9 +42,9 @@ export function performClinicalCalculations(patientData: PatientData): ClinicalC
         egfr,
         onStatin: patientData.medications.some((m) => m.category === 'Statin'),
       })
-    : { totalCVD: 0, ascvd: 0, heartFailure: 0, cad: 0, stroke: 0 };
+    : { totalCVD_10yr: null, ascvd_10yr: null, heartFailure_10yr: null, totalCVD_30yr: null, ascvd_30yr: null, heartFailure_30yr: null };
 
-  const ascvdRisk = preventRisks.totalCVD; // Backward compatibility
+  const ascvdRisk = preventRisks.totalCVD_10yr || 0; // Backward compatibility
   const ascvdCategory = categorizePREVENTRisk(ascvdRisk);
 
   // Determine targets

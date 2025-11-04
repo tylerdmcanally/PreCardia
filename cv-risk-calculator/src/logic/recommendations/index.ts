@@ -83,7 +83,7 @@ export function generateAllDomainRecommendations(
     if (calculations.cha2ds2vasc && (patientData.history.cad || patientData.history.priorMI)) {
       // Patient has BOTH AF and CAD/MI
       const { score, riskCategory, annualStrokeRisk } = calculations.cha2ds2vasc;
-      currentStatus = `AF: CHA2DS2-VASc ${score} (${riskCategory} risk) | CAD/MI: Antiplatelet therapy required`;
+      currentStatus = `AF: CHA2DS2-VASc ${score} (${riskCategory} risk, ${annualStrokeRisk} annual stroke risk) | CAD/MI: Antiplatelet therapy required`;
     } else if (calculations.cha2ds2vasc) {
       // Patient has AF only
       const { score, riskCategory, annualStrokeRisk } = calculations.cha2ds2vasc;

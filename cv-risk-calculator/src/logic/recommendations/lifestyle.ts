@@ -8,7 +8,6 @@ export function generateLifestyleRecommendations(
   const recommendations: DomainRecommendation[] = [];
   const { demographics, history } = patientData;
   const { bmi, bpClassification } = calculations;
-  const isHFpEF = history.heartFailure && history.ejectionFraction !== undefined && history.ejectionFraction >= 50;
 
   // Smoking cessation - HIGHEST PRIORITY
   if (demographics.smokingStatus === 'current') {

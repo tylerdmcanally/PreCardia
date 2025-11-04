@@ -1,5 +1,4 @@
 import { ClinicalReport } from '../../types';
-import { GUIDELINE_REFERENCES } from '../../data/guidelines';
 
 export function formatReportAsText(report: ClinicalReport): string {
   let output = '';

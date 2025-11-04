@@ -121,7 +121,7 @@ export function calculateASCVDRisk(inputs: ASCVDInputs): number {
     baselineSurvival = 0.91436;
   }
 
-  let individualSum =
+  const individualSum =
     coefficients.lnAge * lnAge +
     coefficients.lnAge2 * lnAge2 +
     coefficients.lnTotalChol * lnTotalChol +
