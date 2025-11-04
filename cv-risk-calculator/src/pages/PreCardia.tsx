@@ -887,7 +887,7 @@ export function PreCardia() {
                   </select>
                 </div>
                 {recentMI === 'yes' && (
-                  <div>
+                  <div className="ml-4 pl-4 border-l-2 border-cardio-border bg-cardio-bg/30 rounded-r p-3">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       MI Timing
                     </label>
@@ -926,7 +926,7 @@ export function PreCardia() {
                   </select>
                 </div>
                 {stentType && stentType !== 'none' && (
-                  <div>
+                  <div className="ml-4 pl-4 border-l-2 border-cardio-border bg-cardio-bg/30 rounded-r p-3">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Stent Timing
                     </label>
@@ -964,7 +964,7 @@ export function PreCardia() {
                   </select>
                 </div>
                 {cabg === 'yes' && (
-                  <div>
+                  <div className="ml-4 pl-4 border-l-2 border-cardio-border bg-cardio-bg/30 rounded-r p-3">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       CABG Timing
                     </label>
@@ -1001,7 +1001,7 @@ export function PreCardia() {
                   </select>
                 </div>
                 {tavrTavi === 'yes' && (
-                  <div>
+                  <div className="ml-4 pl-4 border-l-2 border-cardio-border bg-cardio-bg/30 rounded-r p-3">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       TAVR/TAVI Timing
                     </label>
@@ -1044,7 +1044,7 @@ export function PreCardia() {
                   </select>
                 </div>
                 {teer === 'yes' && (
-                  <div>
+                  <div className="ml-4 pl-4 border-l-2 border-cardio-border bg-cardio-bg/30 rounded-r p-3">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       TEER Timing
                     </label>
