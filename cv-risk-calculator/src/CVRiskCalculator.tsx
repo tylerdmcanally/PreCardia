@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { PatientData, Medication, Allergy, MedicationCategory, DomainName, ClinicalReport } from './types';
 import { performClinicalCalculations } from './logic/calculations';
 import { generateClinicalReport } from './logic/report/generateReport';
@@ -17,6 +18,7 @@ import {
   Copy,
   Printer,
   Sparkles,
+  ArrowLeft,
 } from 'lucide-react';
 
 type RaceOption = 'white' | 'black' | 'hispanic' | 'asian' | 'other';
@@ -383,24 +385,20 @@ export function CVRiskCalculator() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-100">
-      <header className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 shadow-2xl border-b-4 border-blue-500/30">
-        <div className="max-w-7xl mx-auto px-8 py-6">
-          <div className="flex items-center gap-4 mb-2">
-            <div className="p-2 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg">
-              <Sparkles className="w-8 h-8 text-white" />
-            </div>
-            <div>
-              <h1 className="text-3xl font-bold text-white tracking-tight">
-                CV Risk Optimization
-              </h1>
-              <p className="text-sm text-slate-300 mt-1 font-medium">Evidence-based medication recommendations for cardiovascular risk reduction</p>
-            </div>
-          </div>
+    <div className="min-h-screen bg-cardio-bg">
+      <div className="container mx-auto px-4 py-8 max-w-7xl">
+        {/* Header */}
+        <div className="bg-white rounded-lg shadow-cardio-lg p-6 mb-6">
+          <Link to="/" className="inline-flex items-center text-cardio-secondary hover:text-cardio-primary mb-4">
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to CardioTools
+          </Link>
+          <h1 className="text-3xl font-bold text-cardio-primary mb-2">CV Risk Optimization</h1>
+          <p className="text-gray-600">Evidence-based medication recommendations for cardiovascular risk reduction</p>
+          <p className="text-sm text-gray-500">Based on 2023 AHA PREVENT Equations, 2017 ACC/AHA HTN Guidelines, 2018 ACC/AHA Cholesterol Guidelines, 2022 Heart Failure Guidelines, 2023 AFib Guidelines, 2024 ADA Standards of Care</p>
         </div>
-      </header>
 
-      <main className="max-w-7xl mx-auto px-8 py-8">
+        <main>
         <div className="grid grid-cols-5 gap-8">
           {/* Left Panel - Input Forms */}
           <div className="col-span-2 space-y-3">
@@ -1130,7 +1128,8 @@ export function CVRiskCalculator() {
             </div>
           </div>
         </div>
-      </main>
+        </main>
+      </div>
     </div>
   );
 }
