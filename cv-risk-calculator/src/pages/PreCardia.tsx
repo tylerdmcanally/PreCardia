@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { PreCardiaData } from '../types/precardia.types';
 import { generatePreCardiaReport } from '../logic/precardia/reportGenerator';
 import { TROPONIN_ASSAY_LIMITS } from '../logic/precardia/constants';
+import { calculateDASI, getFunctionalCapacityCategory } from '../logic/precardia/calculations';
 import { ArrowLeft, FileText, Copy, Printer, ChevronDown, ChevronUp } from 'lucide-react';
 
 type MiTimingOption = '' | 'lt4w' | '4to8w' | 'gt8w' | 'unknown';
@@ -1332,6 +1333,41 @@ export function PreCardia() {
                       </span>
                     </div>
                   ))}
+
+                  {/* DASI Score Calculation */}
+                  {(() => {
+                    const dasiData: Partial<PreCardiaData> = {
+                      dasi1, dasi2, dasi3, dasi4, dasi5, dasi6,
+                      dasi7, dasi8, dasi9, dasi10, dasi11, dasi12
+                    };
+                    const dasiResult = calculateDASI(dasiData as PreCardiaData);
+                    const capacityCategory = getFunctionalCapacityCategory(dasiResult.mets);
+                    return (
+                      <div className="mt-6 pt-4 border-t border-cardio-border bg-cardio-primary/5 rounded-lg p-4">
+                        <h4 className="text-sm font-semibold text-cardio-primary mb-3">DASI Score Calculation</h4>
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <span className="text-gray-600">DASI Score:</span>
+                            <span className="ml-2 font-semibold text-cardio-primary">
+                              {dasiResult.score.toFixed(1)}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-gray-600">Estimated METs:</span>
+                            <span className="ml-2 font-semibold text-cardio-primary">
+                              {dasiResult.mets.toFixed(1)}
+                            </span>
+                          </div>
+                          <div className="col-span-2">
+                            <span className="text-gray-600">Functional Capacity:</span>
+                            <span className="ml-2 font-semibold text-cardio-secondary">
+                              {capacityCategory.description}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               ) : (
                 <div>
