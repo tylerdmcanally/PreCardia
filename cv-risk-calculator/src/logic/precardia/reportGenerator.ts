@@ -401,10 +401,24 @@ export function generatePreCardiaReport(data: PreCardiaData): string {
   }
 
   // Imaging recommendations based on 2024 ACC/AHA Appropriate Use Criteria
+  // Determine numeric METs for imaging algorithm
+  let numericMETs: number | null = null;
+  if (usesDASI && dasiResults) {
+    numericMETs = dasiResults.mets;
+  } else {
+    // Convert functional capacity category to approximate METs
+    const capacity = data.functionalCapacity || 'unknown';
+    if (capacity === 'excellent') numericMETs = 10;
+    else if (capacity === 'good') numericMETs = 8;
+    else if (capacity === 'moderate') numericMETs = 5;
+    else if (capacity === 'poor') numericMETs = 2;
+    // else remains null for 'unknown'
+  }
+
   const imagingInput: ImagingInput = {
     hasKnownHeartDisease: Boolean(data.ischemicHeartDisease || data.heartFailure || data.valvularHeartDisease),
     hasNewOrWorseningSymptoms: Boolean(data.unstableAngina || data.decompensatedHF),
-    functionalCapacityMETs: typeof functionalCapacityInfo.value === 'number' ? functionalCapacityInfo.value : null,
+    functionalCapacityMETs: numericMETs,
     hasCAD: Boolean(data.ischemicHeartDisease),
     hasHeartFailure: Boolean(data.heartFailure),
     heartFailureClass: data.decompensatedHF ? 'IV' : undefined,
