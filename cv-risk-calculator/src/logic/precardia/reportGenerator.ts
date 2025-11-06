@@ -12,6 +12,8 @@ import {
 } from './calculations';
 import { generateRecommendations } from './recommendations';
 import { SURGICAL_RISK, METS_VALUES, TROPONIN_ASSAY_LIMITS } from './constants';
+import { getImagingRecommendations, type ImagingInput } from '../imaging/imagingRecommendations';
+import { APPROPRIATENESS_DEFINITIONS } from '../../data/imagingGuidelines';
 
 const FUNCTIONAL_CAPACITY_CATEGORIES = ['excellent', 'good', 'moderate', 'poor', 'unknown'] as const;
 type FunctionalCapacityCategory = (typeof FUNCTIONAL_CAPACITY_CATEGORIES)[number];
@@ -397,6 +399,70 @@ export function generatePreCardiaReport(data: PreCardiaData): string {
       report.push('');
     });
   }
+
+  // Imaging recommendations based on 2024 ACC/AHA Appropriate Use Criteria
+  const imagingInput: ImagingInput = {
+    hasKnownHeartDisease: Boolean(data.ischemicHeartDisease || data.heartFailure || data.valvularHeartDisease),
+    hasNewOrWorseningSymptoms: Boolean(data.unstableAngina || data.decompensatedHF),
+    functionalCapacityMETs: typeof functionalCapacityInfo.value === 'number' ? functionalCapacityInfo.value : null,
+    hasCAD: Boolean(data.ischemicHeartDisease),
+    hasHeartFailure: Boolean(data.heartFailure),
+    heartFailureClass: data.decompensatedHF ? 'IV' : undefined,
+    hasValvularDisease: Boolean(data.valvularHeartDisease),
+    hasRecentMI: data.recentMI === 'yes',
+    hasRecentHFHospitalization: Boolean(data.decompensatedHF),
+    surgeryType: data.otherSurgery || data.surgeryType,
+    surgeryRisk: surgeryRisk.level === 'Low' ? 'LOW' : 
+                 surgeryRisk.level === 'Intermediate' ? 'INTERMEDIATE' :
+                 surgeryRisk.level === 'High' ? 'HIGH' : 'INTERMEDIATE',
+    hasPriorTestingWithin90Days: false // Could be added as a form field in the future
+  };
+
+  const imagingRecs = getImagingRecommendations(imagingInput);
+
+  report.push('PREOPERATIVE CARDIAC IMAGING RECOMMENDATIONS');
+  report.push('-'.repeat(80));
+  report.push(`Clinical Scenario: ${imagingRecs.scenario.description}`);
+  report.push('');
+  report.push(`Surgery Risk: ${surgeryRisk.level} (${surgeryRisk.risk})`);
+  report.push(`Functional Capacity: ${functionalCapacityInfo.description}`);
+  report.push('');
+
+  if (imagingRecs.appropriateModalities.length > 0) {
+    report.push('APPROPRIATE (A) - Generally acceptable and reasonable approach:');
+    imagingRecs.appropriateModalities.forEach(rec => {
+      report.push(`  • ${rec.modality} (Median Score: ${rec.median}/9)`);
+    });
+    report.push('');
+  }
+
+  if (imagingRecs.mayBeAppropriateModalities.length > 0) {
+    report.push('MAY BE APPROPRIATE (M) - May be acceptable, more research needed:');
+    imagingRecs.mayBeAppropriateModalities.forEach(rec => {
+      report.push(`  • ${rec.modality} (Median Score: ${rec.median}/9)`);
+    });
+    report.push('');
+  }
+
+  if (imagingRecs.rarelyAppropriateModalities.length > 0) {
+    report.push('RARELY APPROPRIATE (R) - Not generally acceptable:');
+    imagingRecs.rarelyAppropriateModalities.forEach(rec => {
+      report.push(`  • ${rec.modality} (Median Score: ${rec.median}/9)`);
+    });
+    report.push('');
+  }
+
+  if (imagingRecs.clinicalGuidance.length > 0) {
+    report.push('Clinical Guidance:');
+    imagingRecs.clinicalGuidance.forEach((guidance, i) => {
+      report.push(`  ${i + 1}. ${guidance}`);
+    });
+    report.push('');
+  }
+
+  report.push('Reference: 2024 ACC/AHA Appropriate Use Criteria for Multimodality Imaging');
+  report.push('(JACC 2024;84(15):1455-1491)');
+  report.push('');
 
   // Testing principles
   report.push('GENERAL PERIOPERATIVE TESTING PRINCIPLES');

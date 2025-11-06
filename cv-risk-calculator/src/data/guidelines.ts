@@ -10,6 +10,7 @@ export const GUIDELINES = {
   AFIB_2019: '2019 AHA/ACC/HRS Atrial Fibrillation Guidelines',
   AFIB_2023: '2023 ACC/AHA/ACCP/HRS Atrial Fibrillation Guideline',
   AFIB_PCI_2020: '2020 ACC Expert Consensus: Anticoagulant/Antiplatelet in AF with PCI',
+  IMAGING_2024: '2024 ACC/AHA Preoperative Imaging Appropriate Use Criteria',
 };
 
 export const GUIDELINE_REFERENCES = [
@@ -72,6 +73,12 @@ export const GUIDELINE_REFERENCES = [
     full: '2020 ACC Expert Consensus Decision Pathway for Anticoagulant and Antiplatelet Therapy in Patients With Atrial Fibrillation or Venous Thromboembolism Undergoing Percutaneous Coronary Intervention or With Atherosclerotic Cardiovascular Disease',
     citation: 'J Am Coll Cardiol. 2021;77(5):629-658',
     url: 'https://www.jacc.org/doi/10.1016/j.jacc.2020.09.011',
+  },
+  {
+    short: GUIDELINES.IMAGING_2024,
+    full: '2024 ACC/AHA/ASE/ASNC/HFSA/HRS/SCAI/SCCT/SCMR/STS Appropriate Use Criteria for Multimodality Imaging in Cardiovascular Evaluation of Patients Undergoing Nonemergent, Noncardiac Surgery',
+    citation: 'J Am Coll Cardiol. 2024;84(15):1455-1491',
+    url: 'https://www.jacc.org/doi/10.1016/j.jacc.2024.07.022',
   },
 ];
 

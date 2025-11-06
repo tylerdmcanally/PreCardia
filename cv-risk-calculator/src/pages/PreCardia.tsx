@@ -328,7 +328,7 @@ export function PreCardia() {
           </Link>
           <h1 className="text-3xl font-bold text-cardio-primary mb-2">PreCardia</h1>
           <p className="text-gray-600">Cardiac Pre-Operative Risk Assessment Tool</p>
-          <p className="text-sm text-gray-500">Based on 2024 ACC/AHA/ACCP/HRS Guidelines</p>
+          <p className="text-sm text-gray-500">Based on 2024 ACC/AHA/ACCP/HRS Perioperative Guidelines and 2024 ACC/AHA Preoperative Imaging Appropriate Use Criteria</p>
         </div>
 
         {/* Demographics Section */}
