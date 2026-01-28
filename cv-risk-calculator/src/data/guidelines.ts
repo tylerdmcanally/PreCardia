@@ -1,10 +1,13 @@
 export const GUIDELINES = {
+  BP_2025: '2025 AHA/ACC HTN Guideline',
   BP_2017: '2017 ACC/AHA HTN Guideline',
   CHOLESTEROL_2018: '2018 ACC/AHA Cholesterol Guideline',
   CHOLESTEROL_2022: '2022 ACC Expert Consensus on Non-Statin Therapies',
   PREVENT_2023: '2023 AHA PREVENT Equations',
   ADA_2024: '2024 ADA Standards of Care',
+  CKD_2024: '2024 KDIGO CKD Guideline',
   KDIGO_2022: '2022 KDIGO Guidelines',
+  KDIGO_BP_2021: '2021 KDIGO Blood Pressure in CKD Guideline',
   HF_2022: '2022 ACC/AHA/HFSA Heart Failure Guideline',
   STEMI_2013: '2013 ACCF/AHA STEMI Guideline',
   AFIB_2019: '2019 AHA/ACC/HRS Atrial Fibrillation Guidelines',
@@ -14,6 +17,13 @@ export const GUIDELINES = {
 };
 
 export const GUIDELINE_REFERENCES = [
+  {
+    short: GUIDELINES.BP_2025,
+    full:
+      '2025 AHA/ACC/AANP/AAPA/ABC/ACCP/ACPM/AGS/AMA/ASPC/NMA/PCNA/SGIM Guideline for the Prevention, Detection, Evaluation, and Management of High Blood Pressure in Adults',
+    citation: 'Circulation. 2025;152:e114–e218. doi:10.1161/CIR.0000000000001356',
+    url: 'https://www.ahajournals.org/doi/10.1161/CIR.0000000000001356',
+  },
   {
     short: GUIDELINES.BP_2017,
     full: '2017 ACC/AHA/AAPA/ABC/ACPM/AGS/APhA/ASH/ASPC/NMA/PCNA Guideline for the Prevention, Detection, Evaluation, and Management of High Blood Pressure in Adults',
@@ -49,6 +59,18 @@ export const GUIDELINE_REFERENCES = [
     full: '2022 KDIGO Clinical Practice Guideline for Diabetes Management in Chronic Kidney Disease',
     citation: 'Kidney Int. 2022;102(5S):S1-S127',
     url: 'https://kdigo.org/guidelines/diabetes-ckd/',
+  },
+  {
+    short: GUIDELINES.CKD_2024,
+    full: 'KDIGO 2024 Clinical Practice Guideline for the Evaluation and Management of Chronic Kidney Disease',
+    citation: 'Kidney Int. 2024;105(4S)',
+    url: 'https://kdigo.org/wp-content/uploads/2024/03/KDIGO-2024-CKD-Guideline.pdf',
+  },
+  {
+    short: GUIDELINES.KDIGO_BP_2021,
+    full: 'KDIGO 2021 Clinical Practice Guideline for the Management of Blood Pressure in Chronic Kidney Disease',
+    citation: 'Kidney Int. 2021;99(3S):S1-S87',
+    url: 'https://kdigo.org/wp-content/uploads/2021/03/KDIGO-2021-BP-Guideline.pdf',
   },
   {
     short: GUIDELINES.HF_2022,

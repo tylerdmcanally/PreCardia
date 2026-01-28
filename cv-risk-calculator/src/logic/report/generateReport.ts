@@ -1,7 +1,8 @@
-import { PatientData, ClinicalCalculations, ClinicalReport, MedicationReview, Medication, ClinicalDomain, DomainRecommendation } from '../../types';
+import { PatientData, ClinicalCalculations, ClinicalReport, MedicationReview, Medication, ClinicalDomain, DomainRecommendation, MedicationCategory } from '../../types';
 import { generateAllDomainRecommendations } from '../recommendations';
 import { buildMonitoringPlan } from './monitoringPlan';
 import { GUIDELINE_REFERENCES, KEY_TRIALS } from '../../data/guidelines';
+import { hasMedicationInCategory } from '../safety/utils';
 
 export function generateClinicalReport(
   patientData: PatientData,
@@ -23,7 +24,7 @@ export function generateClinicalReport(
   const riskProfile = buildRiskProfile(patientData, calculations);
 
   // Build follow-up plan
-  const followUpPlan = buildFollowUpPlan(calculations, domains);
+  const followUpPlan = buildFollowUpPlan(calculations, domains, patientData);
 
   // Compile references
   const references = compileReferences(domains);
@@ -77,7 +78,9 @@ function buildRiskProfile(patientData: PatientData, calculations: ClinicalCalcul
     }
   }
 
-  if (egfr > 0) {
+  if (history.dialysis) {
+    profile += 'Kidney Function: End-stage kidney disease on dialysis (treat as CKD Stage 5D)\n';
+  } else if (egfr > 0) {
     profile += `Kidney Function: eGFR ${egfr} mL/min/1.73m2 (CKD Stage ${ckdStage})\n`;
   }
 
@@ -93,7 +96,11 @@ function buildRiskProfile(patientData: PatientData, calculations: ClinicalCalcul
   const diagnoses: string[] = [];
   if (history.hypertension) diagnoses.push('Hypertension');
   if (history.diabetes) diagnoses.push('Type 2 Diabetes');
-  if (history.ckd || ckdStage >= 3) diagnoses.push(`CKD Stage ${ckdStage}`);
+  if (history.dialysis) {
+    diagnoses.push('CKD Stage 5D (on dialysis)');
+  } else if (history.ckd || ckdStage >= 3) {
+    diagnoses.push(`CKD Stage ${ckdStage}`);
+  }
   if (history.cad) diagnoses.push('CAD');
   if (history.priorMI) diagnoses.push('Prior MI');
   if (history.stroke) diagnoses.push('Prior Stroke');
@@ -119,6 +126,8 @@ function reviewCurrentMedications(
 
   // Collect all recommendations that affect current medications
   const allRecommendations = domains.flatMap((d) => d.recommendations);
+
+  const inCategory = (med: Medication, category: MedicationCategory) => hasMedicationInCategory([med], category);
 
   patientData.medications.forEach((med) => {
     const medNameLower = med.genericName.toLowerCase();
@@ -148,13 +157,13 @@ function reviewCurrentMedications(
 
       // Category-based matching
       const hasCategoryMatch =
-        (medicationLower.includes('ace') && med.category === 'ACE Inhibitor') ||
-        (medicationLower.includes('arb') && med.category === 'ARB') ||
-        (medicationLower.includes('beta blocker') && med.category === 'Beta Blocker') ||
-        (medicationLower.includes('statin') && med.category === 'Statin') ||
-        (medicationLower.includes('diuretic') && (med.category === 'Diuretic - Thiazide' || med.category === 'Diuretic - Loop')) ||
-        (medicationLower.includes('antiplatelet') && med.category === 'Antiplatelet') ||
-        (medicationLower.includes('anticoagulant') && med.category === 'Anticoagulant') ||
+        (medicationLower.includes('ace') && inCategory(med, 'ACE Inhibitor')) ||
+        (medicationLower.includes('arb') && inCategory(med, 'ARB')) ||
+        (medicationLower.includes('beta blocker') && inCategory(med, 'Beta Blocker')) ||
+        (medicationLower.includes('statin') && inCategory(med, 'Statin')) ||
+        (medicationLower.includes('diuretic') && (inCategory(med, 'Diuretic - Thiazide') || inCategory(med, 'Diuretic - Loop'))) ||
+        (medicationLower.includes('antiplatelet') && inCategory(med, 'Antiplatelet')) ||
+        (medicationLower.includes('anticoagulant') && inCategory(med, 'Anticoagulant')) ||
         (medicationLower.includes('aspirin') && medNameLower.includes('aspirin')) ||
         (medicationLower.includes('clopidogrel') && medNameLower.includes('clopidogrel')) ||
         (medicationLower.includes('warfarin') && medNameLower.includes('warfarin')) ||
@@ -194,8 +203,10 @@ function checkIfNeedsOptimization(
   patientData: PatientData,
   calculations: ClinicalCalculations
 ): boolean {
+  const matches = (category: MedicationCategory) => hasMedicationInCategory([med], category);
+
   // BP med optimization
-  if (['ACE Inhibitor', 'ARB', 'Calcium Channel Blocker'].includes(med.category)) {
+  if (['ACE Inhibitor', 'ARB', 'Calcium Channel Blocker'].some((cat) => matches(cat as MedicationCategory))) {
     const bpAboveTarget =
       calculations.averageBP.systolic > calculations.bpTarget.systolic ||
       calculations.averageBP.diastolic > calculations.bpTarget.diastolic;
@@ -203,7 +214,7 @@ function checkIfNeedsOptimization(
   }
 
   // Statin optimization
-  if (med.category === 'Statin') {
+  if (matches('Statin')) {
     const hasASCVD = patientData.history.cad || patientData.history.priorMI || patientData.history.stroke;
     const highIntensityStatins = ['atorvastatin 40', 'atorvastatin 80', 'rosuvastatin 20', 'rosuvastatin 40'];
     const isHighIntensity = highIntensityStatins.some((s) =>
@@ -216,8 +227,9 @@ function checkIfNeedsOptimization(
   return false;
 }
 
-function buildFollowUpPlan(calculations: ClinicalCalculations, domains: ClinicalDomain[]): string {
+function buildFollowUpPlan(calculations: ClinicalCalculations, domains: ClinicalDomain[], patientData?: PatientData): string {
   const allRecs = domains.flatMap((d) => d.recommendations);
+  const onDialysis = Boolean(calculations.ckdStage === 5 && domains.some((d) => d.name)) || Boolean(patientData?.history.dialysis);
 
   // Determine next appointment timing based on urgency
   const timing = determineNextAppointmentTiming(allRecs, calculations);
@@ -237,7 +249,12 @@ function buildFollowUpPlan(calculations: ClinicalCalculations, domains: Clinical
 
   // Target goals for next visit
   plan += 'Target Goals for Next Visit:\n';
-  plan += `• BP <${calculations.bpTarget.systolic}/${calculations.bpTarget.diastolic} mmHg (home readings)\n`;
+  if (onDialysis) {
+    plan += '• BP individualized on dialysis: prioritize dry-weight optimization; avoid pre-dialysis hypotension (<120 systolic)\n';
+    plan += '• Review intradialytic BP trends and home/off-dialysis readings\n';
+  } else {
+    plan += `• BP <${calculations.bpTarget.systolic}/${calculations.bpTarget.diastolic} mmHg (home readings)\n`;
+  }
   plan += '• Medication adherence and tolerability\n';
 
   const hasSmokingRec = allRecs.some(

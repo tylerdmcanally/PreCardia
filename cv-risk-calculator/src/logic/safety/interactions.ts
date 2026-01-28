@@ -92,7 +92,7 @@ export function getInteractionAlerts(
         recommendedDose: 'N/A',
         rationale:
           'Multiple concurrent RAAS inhibitors identified. Combination therapy raises risk for hypotension, renal injury, and hyperkalemia.',
-        evidence: GUIDELINES.BP_2017,
+        evidence: GUIDELINES.BP_2025,
         monitoring: 'Rationalize RAAS therapy to a single agent (or ARNI). Review indication for each agent and adjust promptly.',
         additionalNotes: 'Avoid overlapping ACE-I, ARB, and ARNI therapy outside of specialist-directed transitions.',
       },

@@ -15,8 +15,13 @@ export function getDoseAdjustmentAlerts(
   calculations: ClinicalCalculations
 ): SafetyCheckResult[] {
   const alerts: SafetyCheckResult[] = [];
+  const onDialysis = Boolean(patientData.history.dialysis);
   const egfr = calculations.egfr;
   const metformin = getMetformin(patientData.medications);
+
+  if (onDialysis) {
+    return alerts;
+  }
 
   if (metformin && egfr >= 30 && egfr < 45) {
     alerts.push({

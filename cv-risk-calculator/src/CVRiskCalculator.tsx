@@ -71,6 +71,7 @@ export function CVRiskCalculator() {
   const [hyperlipidemia, setHyperlipidemia] = useState(false);
   const [diabetes, setDiabetes] = useState(false);
   const [ckd, setCkd] = useState(false);
+  const [dialysis, setDialysis] = useState(false);
   const [cad, setCad] = useState(false);
   const [priorMI, setPriorMI] = useState(false);
   const [priorPCI, setPriorPCI] = useState(false);
@@ -126,6 +127,7 @@ export function CVRiskCalculator() {
         hypertension,
         diabetes,
         ckd,
+        dialysis,
         cad,
         priorMI,
         priorPCI,
@@ -395,7 +397,7 @@ export function CVRiskCalculator() {
           </Link>
           <h1 className="text-3xl font-bold text-cardio-primary mb-2">CV Risk Optimization</h1>
           <p className="text-gray-600">Evidence-based medication recommendations for cardiovascular risk reduction</p>
-          <p className="text-sm text-gray-500">Based on 2023 AHA PREVENT Equations, 2017 ACC/AHA HTN Guidelines, 2018 ACC/AHA Cholesterol Guidelines, 2022 Heart Failure Guidelines, 2023 AFib Guidelines, 2024 ADA Standards of Care</p>
+          <p className="text-sm text-gray-500">Based on 2023 AHA PREVENT Equations, 2025 AHA/ACC HTN Guideline, 2018 ACC/AHA Cholesterol Guidelines, 2022 Heart Failure Guidelines, 2023 AFib Guidelines, 2024 ADA Standards of Care</p>
         </div>
 
         <main>
@@ -529,6 +531,16 @@ export function CVRiskCalculator() {
                     { label: 'Hyperlipidemia', value: hyperlipidemia, setter: setHyperlipidemia },
                     { label: 'Type 2 Diabetes', value: diabetes, setter: setDiabetes },
                     { label: 'Chronic Kidney Disease', value: ckd, setter: setCkd },
+                    {
+                      label: 'On Dialysis (ESKD)',
+                      value: dialysis,
+                      setter: (checked: boolean) => {
+                        setDialysis(checked);
+                        if (checked) {
+                          setCkd(true);
+                        }
+                      },
+                    },
                     { label: 'Coronary Artery Disease', value: cad, setter: setCad },
                     { label: 'Prior MI', value: priorMI, setter: setPriorMI },
                   ].map((item) => (

@@ -32,7 +32,7 @@ export function generateLifestyleRecommendations(
       medication: 'Dietary Modification',
       recommendedDose: '',
       rationale: '',
-      evidence: GUIDELINES.BP_2017,
+      evidence: GUIDELINES.BP_2025,
       additionalNotes: `DASH diet: High in fruits, vegetables, whole grains; low in saturated fat
 Sodium restriction: <2000mg daily (ideally <1500mg)
 Expected impact: 5-8 mmHg systolic BP reduction`,

@@ -5,6 +5,7 @@ export function buildMonitoringPlan(
   patientData: PatientData,
   calculations: ClinicalCalculations
 ): MonitoringPlan {
+  const onDialysis = Boolean(patientData.history.dialysis);
   const plan: MonitoringPlan = {
     shortTerm: [],
     mediumTerm: [],
@@ -65,6 +66,14 @@ export function buildMonitoringPlan(
     });
   }
 
+  if (onDialysis) {
+    plan.mediumTerm.push({
+      timing: 'Monthly (align with dialysis labs)',
+      tests: ['BMP with potassium/bicarbonate', 'Calcium/phosphorus'],
+      purpose: 'Assess BP tolerance and electrolytes when adjusting cardio-renal medications in ESKD',
+    });
+  }
+
   if (hasACEARB || hasSGLT2i) {
     plan.mediumTerm.push({
       timing: '3 Months',
@@ -74,12 +83,20 @@ export function buildMonitoringPlan(
   }
 
   // Long-term monitoring
-  if (patientData.history.diabetes || patientData.history.ckd || calculations.egfr < 60) {
-    plan.longTerm.push({
-      timing: '6 Months',
-      tests: ['Comprehensive metabolic panel', 'Urine albumin-to-creatinine ratio (UACR)'],
-      purpose: 'Monitor proteinuria in CKD/diabetes; guides ACE-I effectiveness',
-    });
+  if (patientData.history.diabetes || patientData.history.ckd || calculations.egfr < 60 || onDialysis) {
+    if (onDialysis) {
+      plan.longTerm.push({
+        timing: 'Quarterly',
+        tests: ['Dialysis labs (BMP, calcium/phosphorus)', 'Review dry weight and BP log'],
+        purpose: 'Track electrolyte shifts and BP goals while on dialysis and cardio-renal therapies',
+      });
+    } else {
+      plan.longTerm.push({
+        timing: '6 Months',
+        tests: ['Comprehensive metabolic panel', 'Urine albumin-to-creatinine ratio (UACR)'],
+        purpose: 'Monitor proteinuria in CKD/diabetes; guides ACE-I effectiveness',
+      });
+    }
   }
 
   plan.longTerm.push({

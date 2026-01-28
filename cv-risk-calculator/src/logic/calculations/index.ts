@@ -4,9 +4,11 @@ import { calculateEGFR, stageCKD } from './egfr';
 import { calculateAverageBP, classifyBloodPressure, determineBPTarget } from './bpClassification';
 import { calculateAllPREVENTRisks, categorizePREVENTRisk } from './prevent';
 import { calculateCHA2DS2VASc, interpretCHA2DS2VASc } from './cha2ds2vasc';
+import { hasMedicationInCategory } from '../safety/utils';
 
 export function performClinicalCalculations(patientData: PatientData): ClinicalCalculations {
   const { demographics, history, labs, bpReadings } = patientData;
+  const onDialysis = Boolean(history.dialysis);
 
   // BMI - only calculate if weight is provided
   const bmi = demographics.weightLbs > 0
@@ -15,7 +17,7 @@ export function performClinicalCalculations(patientData: PatientData): ClinicalC
 
   // eGFR - auto-calculate from creatinine using CKD-EPI 2021 equation
   const egfr = labs.creatinine ? calculateEGFR(labs.creatinine, demographics.age, demographics.sex) : 0;
-  const ckdStage = egfr > 0 ? stageCKD(egfr) : history.ckdStage || 0;
+  const ckdStage = onDialysis ? 5 : egfr > 0 ? stageCKD(egfr) : history.ckdStage || 0;
 
   // BP
   const averageBP = calculateAverageBP(bpReadings);
@@ -32,15 +34,15 @@ export function performClinicalCalculations(patientData: PatientData): ClinicalC
         hdl: labs.hdl!,
         systolicBP: averageBP.systolic,
         onBPMeds: patientData.medications.some((m) =>
-          ['ACE Inhibitor', 'ARB', 'Beta Blocker', 'Calcium Channel Blocker', 'Diuretic - Thiazide', 'Diuretic - Loop'].includes(
-            m.category
+          ['ACE Inhibitor', 'ARB', 'Beta Blocker', 'Calcium Channel Blocker', 'Diuretic - Thiazide', 'Diuretic - Loop'].some((cat) =>
+            hasMedicationInCategory([m], cat as any)
           )
         ),
         diabetic: history.diabetes,
         smoker: demographics.smokingStatus === 'current',
         bmi,
         egfr,
-        onStatin: patientData.medications.some((m) => m.category === 'Statin'),
+        onStatin: hasMedicationInCategory(patientData.medications, 'Statin'),
       })
     : { totalCVD_10yr: null, ascvd_10yr: null, heartFailure_10yr: null, totalCVD_30yr: null, ascvd_30yr: null, heartFailure_30yr: null };
 
@@ -52,7 +54,7 @@ export function performClinicalCalculations(patientData: PatientData): ClinicalC
   const bpTarget = determineBPTarget({
     hasASCVD,
     hasDiabetes: history.diabetes,
-    hasCKD: history.ckd || egfr < 60,
+    hasCKD: history.ckd || onDialysis || egfr < 60,
     ascvdRisk,
   });
 

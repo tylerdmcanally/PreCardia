@@ -1,6 +1,7 @@
 import { PatientData, ClinicalCalculations, DomainRecommendation } from '../../types';
 import { GUIDELINES } from '../../data/guidelines';
 import { getSafetyRecommendationsForDomain } from '../safety';
+import { getDOACMedications, hasMedicationInCategory } from '../safety/utils';
 
 export function generateAnticoagulationRecommendations(
   patientData: PatientData,
@@ -15,6 +16,7 @@ export function generateAnticoagulationRecommendations(
   ];
   const { history, medications } = patientData;
   const { cha2ds2vasc, egfr } = calculations;
+  const onDialysis = Boolean(history.dialysis);
 
 
   // Only generate recommendations if patient has atrial fibrillation
@@ -22,31 +24,16 @@ export function generateAnticoagulationRecommendations(
     return recommendations;
   }
 
-  const hasAnticoagulant = medications.some(
-    (m) =>
-      m.category === 'Anticoagulant' ||
-      m.genericName.toLowerCase().includes('apixaban') ||
-      m.genericName.toLowerCase().includes('rivaroxaban') ||
-      m.genericName.toLowerCase().includes('edoxaban') ||
-      m.genericName.toLowerCase().includes('dabigatran') ||
-      m.genericName.toLowerCase().includes('warfarin')
-  );
+  const hasAnticoagulant = hasMedicationInCategory(medications, 'Anticoagulant');
 
-  const hasDOAC = medications.some(
-    (m) =>
-      (m.category === 'Anticoagulant' && !m.genericName.toLowerCase().includes('warfarin')) ||
-      m.genericName.toLowerCase().includes('apixaban') ||
-      m.genericName.toLowerCase().includes('rivaroxaban') ||
-      m.genericName.toLowerCase().includes('edoxaban') ||
-      m.genericName.toLowerCase().includes('dabigatran')
-  );
+  const hasDOAC = getDOACMedications(medications).length > 0;
 
   const hasWarfarin = medications.some(
-    (m) => (m.category === 'Anticoagulant' && m.genericName.toLowerCase().includes('warfarin'))
+    (m) => hasMedicationInCategory([m], 'Anticoagulant') && m.genericName.toLowerCase().includes('warfarin')
   );
 
   const { score, riskCategory } = cha2ds2vasc;
-  const canUseDOAC = egfr >= 30;
+  const canUseDOAC = egfr >= 30 && !onDialysis;
 
   
 
@@ -71,7 +58,7 @@ export function generateAnticoagulationRecommendations(
   }
 
   // HIGH PRIORITY: Warfarin to DOAC switch recommendation
-  if (riskCategory === 'High' && hasWarfarin && !hasDOAC && egfr >= 30) {
+  if (riskCategory === 'High' && hasWarfarin && !hasDOAC && egfr >= 30 && !onDialysis) {
     recommendations.push({
       priority: 'HIGH',
       action: 'SWITCH',

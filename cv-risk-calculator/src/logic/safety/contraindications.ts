@@ -7,6 +7,7 @@ import {
   findMedicationByKeywords,
   formatMedicationLabel,
   getDOACMedications,
+  getMedicationsByCategory,
   getMetformin,
   getMRAMedications,
   getRAASMedications,
@@ -20,6 +21,7 @@ export function getContraindicationAlerts(
   calculations: ClinicalCalculations
 ): SafetyCheckResult[] {
   const alerts: SafetyCheckResult[] = [];
+  const onDialysis = Boolean(patientData.history.dialysis);
   const potassium = patientData.labs.potassium ?? 0;
   const egfr = calculations.egfr;
   const raasMedications = getRAASMedications(patientData.medications);
@@ -35,7 +37,7 @@ export function getContraindicationAlerts(
         medication: formatMedicationLabel(firstRAASMedication, 'RAAS inhibitor'),
         recommendedDose: 'N/A',
         rationale: `SEVERE HYPERKALEMIA: K+ ${potassium.toFixed(1)} mEq/L while on RAAS inhibition. Risk of life-threatening arrhythmia.`,
-        evidence: GUIDELINES.BP_2017,
+        evidence: GUIDELINES.BP_2025,
         monitoring:
           'HOLD all ACE-I/ARB/ARNI agents. Recheck BMP in 3-5 days after addressing reversible causes (diet, K+ supplements, renal function).',
         additionalNotes:
@@ -54,7 +56,7 @@ export function getContraindicationAlerts(
         medication: formatMedicationLabel(firstRAASMedication, 'RAAS inhibitor'),
         recommendedDose: 'N/A',
         rationale: `ADVANCED CKD: eGFR ${egfr.toFixed(0)} mL/min/1.73m2 on RAAS inhibition. High risk of acute kidney injury and hyperkalemia.`,
-        evidence: GUIDELINES.BP_2017,
+        evidence: GUIDELINES.BP_2025,
         monitoring:
           'Close monitoring required: check BMP weekly for 1 month, then monthly. Hold if creatinine increases >30% from baseline or potassium >5.5.',
         additionalNotes:
@@ -64,7 +66,7 @@ export function getContraindicationAlerts(
   }
 
   const metformin = getMetformin(patientData.medications);
-  if (metformin && egfr > 0 && egfr < 30) {
+  if (metformin && (onDialysis || (egfr > 0 && egfr < 30))) {
     alerts.push({
       domain: 'DIABETES_CARDIORENAL',
       source: 'CONTRAINDICATION',
@@ -73,11 +75,48 @@ export function getContraindicationAlerts(
         action: 'DISCONTINUE',
         medication: formatMedicationLabel(metformin, 'Metformin'),
         recommendedDose: 'N/A',
-        rationale: `CONTRAINDICATED: Metformin with eGFR ${egfr.toFixed(0)} mL/min/1.73m2. Elevated risk of lactic acidosis.`,
+        rationale: `CONTRAINDICATED: Metformin with ${onDialysis ? 'dialysis-dependent CKD' : `eGFR ${egfr.toFixed(0)} mL/min/1.73m2`}. Elevated risk of lactic acidosis.`,
         evidence: GUIDELINES.ADA_2024,
         monitoring:
-          'Discontinue immediately. Recheck renal function in 1 week. Transition to alternate therapy (consider insulin, SGLT2i if eGFR ≥20, or DPP-4 inhibitor).',
-        additionalNotes: 'Metformin is contraindicated when eGFR <30. If eGFR improves to ≥30, reassess candidacy at reduced dosing.',
+          'Discontinue immediately. Recheck renal function in 1 week. Transition to alternate therapy (consider insulin, GLP-1 RA, or DPP-4 inhibitor).',
+        additionalNotes: 'Metformin is contraindicated when eGFR <30 or once dialysis is initiated. If eGFR improves to ≥30 off dialysis, reassess candidacy at reduced dosing.',
+      },
+    });
+  }
+
+  const sglt2Medications = getMedicationsByCategory(patientData.medications, ['Diabetes - SGLT2i']);
+  if (onDialysis && sglt2Medications.length > 0) {
+    alerts.push({
+      domain: 'DIABETES_CARDIORENAL',
+      source: 'CONTRAINDICATION',
+      recommendation: {
+        priority: 'HIGH',
+        action: 'DISCONTINUE',
+        medication: describeMedicationList(sglt2Medications, 'SGLT2 inhibitor'),
+        recommendedDose: 'N/A',
+        rationale:
+          'SGLT2 inhibitors are not recommended once a patient is dialysis-dependent; no glycemic or cardio-renal benefit and potential for adverse effects.',
+        evidence: `${GUIDELINES.KDIGO_2022}; ${GUIDELINES.CKD_2024}`,
+        monitoring: 'Stop agent and monitor volume status/glucose. Reassess regimen with nephrology/endocrinology.',
+        additionalNotes: 'KDIGO/ADA recommend stopping SGLT2i when dialysis starts.',
+      },
+    });
+  }
+
+  const finerenone = findMedicationByKeywords(patientData.medications, ['finerenone', 'kerendia']);
+  if (finerenone && onDialysis) {
+    alerts.push({
+      domain: 'DIABETES_CARDIORENAL',
+      source: 'CONTRAINDICATION',
+      recommendation: {
+        priority: 'HIGH',
+        action: 'DISCONTINUE',
+        medication: formatMedicationLabel(finerenone, 'Finerenone'),
+        recommendedDose: 'N/A',
+        rationale: 'Finerenone has not been studied in ESKD on dialysis and is not recommended due to hyperkalemia risk.',
+        evidence: GUIDELINES.KDIGO_2022,
+        monitoring: 'Coordinate with nephrology for alternative albuminuria management and monitor potassium if recently dosed.',
+        additionalNotes: 'Restart only if kidney function recovers off dialysis and albuminuric CKD persists with eGFR ≥25.',
       },
     });
   }
@@ -109,22 +148,22 @@ export function getContraindicationAlerts(
         domain: 'BLOOD_PRESSURE',
         source: 'CONTRAINDICATION',
         recommendation: {
-          priority: 'MODERATE',
-          action: 'ADJUST',
-          medication: nsaidList,
-          recommendedDose: 'Minimize dose/duration; consider discontinuation',
-          rationale:
-            'NSAIDs + RAAS blockade +/- diuretics increase risk of acute kidney injury, hyperkalemia, and loss of BP control ("triple whammy").',
-          evidence: GUIDELINES.BP_2017,
-          monitoring: 'If NSAID necessary, use lowest dose short-term; monitor BMP (Cr/K+) within 1 week and reassess BP control.',
-          additionalNotes: 'Consider PPI for GI protection if NSAID absolutely required. Educate patient to avoid OTC NSAIDs.',
-        },
+        priority: 'MODERATE',
+        action: 'ADJUST',
+        medication: nsaidList,
+        recommendedDose: 'Minimize dose/duration; consider discontinuation',
+        rationale:
+          'NSAIDs + RAAS blockade +/- diuretics increase risk of acute kidney injury, hyperkalemia, and loss of BP control ("triple whammy").',
+        evidence: GUIDELINES.BP_2025,
+        monitoring: 'If NSAID necessary, use lowest dose short-term; monitor BMP (Cr/K+) within 1 week and reassess BP control.',
+        additionalNotes: 'Consider PPI for GI protection if NSAID absolutely required. Educate patient to avoid OTC NSAIDs.',
+      },
       });
     }
 
     const onAntithrombotic =
       getDOACMedications(patientData.medications).length > 0 ||
-      patientData.medications.some((med) => med.category === 'Antiplatelet') ||
+      getMedicationsByCategory(patientData.medications, ['Antiplatelet']).length > 0 ||
       Boolean(findMedicationByKeywords(patientData.medications, ['warfarin'])) ||
       Boolean(findMedicationByKeywords(patientData.medications, ['aspirin']));
 
@@ -204,7 +243,7 @@ export function getContraindicationAlerts(
   }
 
   const doacMedications = getDOACMedications(patientData.medications);
-  if (doacMedications.length > 0 && egfr > 0 && egfr < 15) {
+  if (doacMedications.length > 0 && ((egfr > 0 && egfr < 15) || onDialysis)) {
     const medicationList = describeMedicationList(doacMedications, 'DOAC');
     alerts.push({
       domain: 'ANTIPLATELET_ANTICOAGULATION',
@@ -214,7 +253,7 @@ export function getContraindicationAlerts(
         action: 'DISCONTINUE',
         medication: medicationList,
         recommendedDose: 'N/A',
-        rationale: `CONTRAINDICATED: DOAC with eGFR ${egfr.toFixed(0)} mL/min/1.73m2. Drug accumulation leads to life-threatening bleeding risk.`,
+        rationale: `CONTRAINDICATED: DOAC with ${onDialysis ? 'dialysis-dependent CKD' : `eGFR ${egfr.toFixed(0)} mL/min/1.73m2`}. Drug accumulation leads to life-threatening bleeding risk.`,
         evidence: GUIDELINES.AFIB_2019,
         monitoring:
           'Stop DOAC immediately. Consider transition to warfarin with INR monitoring or left atrial appendage closure. Consult cardiology/hematology.',
@@ -274,6 +313,7 @@ export function getContraindicationAlerts(
 export function hasRAASSafetyHold(patientData: PatientData, calculations: ClinicalCalculations): boolean {
   const potassium = patientData.labs.potassium ?? 0;
   const egfr = calculations.egfr;
+  if (patientData.history.dialysis) return true;
   if (potassium > 5.5) return true;
   if (egfr > 0 && egfr < 30) return true;
   return false;
@@ -282,6 +322,7 @@ export function hasRAASSafetyHold(patientData: PatientData, calculations: Clinic
 export function hasMRASafetyHold(patientData: PatientData, calculations: ClinicalCalculations): boolean {
   const potassium = patientData.labs.potassium ?? 0;
   const egfr = calculations.egfr;
+  if (patientData.history.dialysis) return true;
   if (potassium >= 5.0) return true;
   if (egfr > 0 && egfr < 30) return true;
   return false;

@@ -32,7 +32,40 @@ const CATEGORY_KEYWORDS: Partial<Record<MedicationCategory, string[]>> = {
     'sacubitril valsartan',
   ],
   MRA: ['mra', 'spironolactone', 'eplerenone', 'finerenone'],
-  'Diabetes - Metformin': ['metformin', 'glucophage'],
+  Statin: [
+    'statin',
+    'atorvastatin',
+    'rosuvastatin',
+    'simvastatin',
+    'pravastatin',
+    'lovastatin',
+    'fluvastatin',
+    'pitavastatin',
+  ],
+  'Diabetes - Metformin': ['metformin', 'glucophage', 'metformin xr', 'metformin er'],
+  'Diabetes - SGLT2i': [
+    'sglt2',
+    'empagliflozin',
+    'dapagliflozin',
+    'canagliflozin',
+    'ertugliflozin',
+    'synjardy',
+    'xigduo',
+    'invokamet',
+    'glyxambi',
+    'qtern',
+  ],
+  'Diabetes - GLP-1 RA': [
+    'glp-1',
+    'semaglutide',
+    'liraglutide',
+    'dulaglutide',
+    'tirzepatide',
+    'exenatide',
+    'lixisenatide',
+    'xultophy',
+    'soliqua',
+  ],
   Anticoagulant: [
     'anticoagulant',
     'apixaban',
@@ -46,7 +79,12 @@ const CATEGORY_KEYWORDS: Partial<Record<MedicationCategory, string[]>> = {
     'warfarin',
     'coumadin',
     'jantoven',
+    'enoxaparin',
+    'lovenox',
   ],
+  Antiplatelet: ['aspirin', 'asa', 'clopidogrel', 'prasugrel', 'ticagrelor', 'dipyridamole', 'cilostazol', 'aggrenox'],
+  'Diuretic - Thiazide': ['hydrochlorothiazide', 'chlorthalidone', 'indapamide', 'metolazone'],
+  'Diuretic - Loop': ['furosemide', 'bumetanide', 'torsemide'],
 };
 
 const DOAC_KEYWORDS = ['apixaban', 'rivaroxaban', 'edoxaban', 'dabigatran'];
@@ -55,6 +93,19 @@ export const RAAS_CATEGORIES: MedicationCategory[] = ['ACE Inhibitor', 'ARB', 'A
 
 function normalize(value: string | undefined): string {
   return (value || '').toLowerCase();
+}
+
+function medicationMatchesCategory(medication: Medication, category: MedicationCategory): boolean {
+  if (medication.category === category) return true;
+  const keywords = CATEGORY_KEYWORDS[category];
+  if (!keywords) return false;
+
+  const generic = normalize(medication.genericName);
+  const name = normalize((medication as any).name || '');
+  return keywords.some((keyword) => generic.includes(keyword) || name.includes(keyword));
+}
+export function hasMedicationInCategory(medications: Medication[], category: MedicationCategory): boolean {
+  return medications.some((med) => medicationMatchesCategory(med, category));
 }
 
 export function hasAllergyToCategory(allergies: Allergy[], category: MedicationCategory): boolean {
@@ -76,14 +127,14 @@ export function getMedicationsByCategory(
   medications: Medication[],
   categories: MedicationCategory[]
 ): Medication[] {
-  return medications.filter((medication) => categories.includes(medication.category));
+  return medications.filter((medication) => categories.some((category) => medicationMatchesCategory(medication, category)));
 }
 
 export function findFirstMedicationByCategory(
   medications: Medication[],
   categories: MedicationCategory[]
 ): Medication | undefined {
-  return medications.find((medication) => categories.includes(medication.category));
+  return medications.find((medication) => categories.some((category) => medicationMatchesCategory(medication, category)));
 }
 
 export function formatMedicationLabel(medication: Medication | undefined, fallback: string): string {

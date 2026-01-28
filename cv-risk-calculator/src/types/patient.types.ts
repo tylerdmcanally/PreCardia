@@ -14,6 +14,7 @@ export interface MedicalHistory {
   diabetes: boolean;
   diabetesYears?: number;
   ckd: boolean;
+  dialysis?: boolean;
   ckdStage?: 1 | 2 | 3 | 4 | 5;
   cad: boolean;
   priorMI: boolean;

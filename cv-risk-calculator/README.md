@@ -124,6 +124,7 @@ The production build in the `dist/` directory is a static site that can be deplo
 ### References
 1. **PREVENT Equations:** Khan SS, et al. Novel Prediction Equations for Absolute Risk Assessment of Total Cardiovascular Disease Incorporating Cardiovascular-Kidney-Metabolic Health. Circulation. 2023.
 2. **Perioperative Guidelines:** Fleisher LA, et al. 2024 ACC/AHA/ACCP/HRS Guideline for Perioperative Cardiovascular Evaluation and Management for Noncardiac Surgery.
+3. **CKD & Dialysis Care:** KDIGO 2024 CKD Guideline; KDIGO 2021 Blood Pressure in CKD; KDIGO 2022 Diabetes Management in CKD. Dialysis-specific safety and medication logic are incorporated for ACE/ARB/ARNI holds, SGLT2i discontinuation, and anticoagulation adjustments.
 
 ## License
 

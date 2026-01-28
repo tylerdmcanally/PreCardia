@@ -1,6 +1,7 @@
 import { PatientData, ClinicalCalculations, DomainRecommendation } from '../../types';
 import { GUIDELINES } from '../../data/guidelines';
 import { getSafetyRecommendationsForDomain } from '../safety';
+import { hasMedicationInCategory } from '../safety/utils';
 
 export function generateDiabetesRecommendations(
   patientData: PatientData,
@@ -11,26 +12,40 @@ export function generateDiabetesRecommendations(
   ];
   const { history, labs, medications } = patientData;
   const { egfr, ascvdRisk } = calculations;
+  const onDialysis = Boolean(history.dialysis);
 
   if (!history.diabetes) {
     return recommendations;
   }
 
   const a1c = labs.a1c || 0;
-  const hasMetformin = medications.some((m) => m.genericName.toLowerCase().includes('metformin'));
-  const hasSGLT2i = medications.some((m) => m.category === 'Diabetes - SGLT2i');
-  const hasGLP1 = medications.some((m) => m.category === 'Diabetes - GLP-1 RA');
-  const hasMRA = medications.some((m) => m.category === 'MRA');
+  const hasMetformin = hasMedicationInCategory(medications, 'Diabetes - Metformin');
+  const hasSGLT2i = hasMedicationInCategory(medications, 'Diabetes - SGLT2i');
+  const hasGLP1 = hasMedicationInCategory(medications, 'Diabetes - GLP-1 RA');
+  const hasMRA = hasMedicationInCategory(medications, 'MRA');
 
   const hasASCVD = history.cad || history.priorMI || history.stroke || history.pad;
   const hasHF = history.heartFailure;
-  const hasCKD = history.ckd || egfr < 60;
+  const hasCKD = history.ckd || onDialysis || egfr < 60;
   const hasAlbuminuria = labs.uacr !== undefined && labs.uacr >= 30;
 
   const highCVRisk = hasASCVD || hasHF || hasCKD || ascvdRisk >= 15;
 
+  if (onDialysis) {
+    recommendations.push({
+      priority: 'HIGH',
+      action: 'ADJUST',
+      medication: 'Diabetes regimen on dialysis',
+      recommendedDose: 'Avoid metformin and SGLT2i; favor insulin or GLP-1 RA for CV benefit',
+      rationale:
+        'Dialysis patients do not benefit from SGLT2 inhibitors and metformin is contraindicated; glucose management should rely on insulin and/or GLP-1 RA with nephrology input.',
+      evidence: `${GUIDELINES.ADA_2024}; ${GUIDELINES.CKD_2024}`,
+      additionalNotes: 'Finerenone not studied in dialysis; reassess if kidney function recovers off dialysis.',
+    });
+  }
+
   // HIGH PRIORITY: Metformin if not on it
-  if (!hasMetformin && egfr >= 30) {
+  if (!hasMetformin && egfr >= 30 && !onDialysis) {
     recommendations.push({
       priority: 'HIGH',
       action: 'ADD',
@@ -44,7 +59,7 @@ export function generateDiabetesRecommendations(
   }
 
   // HIGH PRIORITY: SGLT2i for diabetes + high CV risk
-  if (highCVRisk && !hasSGLT2i && egfr >= 20) {
+  if (highCVRisk && !hasSGLT2i && egfr >= 20 && !onDialysis) {
     const indication = hasASCVD
       ? 'established CAD'
       : hasHF
@@ -67,7 +82,7 @@ export function generateDiabetesRecommendations(
   }
 
   // HIGH PRIORITY: Finerenone for diabetic CKD with albuminuria
-  if (history.ckd && hasAlbuminuria && egfr >= 25 && !hasMRA) {
+  if (history.ckd && hasAlbuminuria && egfr >= 25 && !hasMRA && !onDialysis) {
     recommendations.push({
       priority: 'HIGH',
       action: 'ADD',
@@ -82,14 +97,16 @@ export function generateDiabetesRecommendations(
   }
 
   // MODERATE PRIORITY: GLP-1 RA for additional benefit
-  if (highCVRisk && !hasGLP1 && a1c > 7) {
+  if (highCVRisk && !hasGLP1 && (a1c > 7 || onDialysis)) {
     recommendations.push({
       priority: 'MODERATE',
       action: 'CONSIDER',
       medication: 'Semaglutide',
       recommendedDose: '0.25mg weekly, titrate to 0.5-1mg weekly',
       rationale:
-        'Dual therapy with SGLT2i + GLP-1 RA shows additive CV benefit in high-risk patients; additional A1c reduction 1-1.5% and weight loss 10-15 lbs',
+        onDialysis
+          ? 'Dialysis patients with diabetes/high CV risk can still derive ASCVD benefit from GLP-1 RA; SGLT2i and metformin are not options in ESKD.'
+          : 'Dual therapy with SGLT2i + GLP-1 RA shows additive CV benefit in high-risk patients; additional A1c reduction 1-1.5% and weight loss 10-15 lbs',
       evidence: GUIDELINES.ADA_2024,
       additionalNotes:
         'SUSTAIN-6 trial demonstrated CV benefit; discuss cost, injection burden, and GI tolerability with patient',
@@ -97,7 +114,7 @@ export function generateDiabetesRecommendations(
     });
   }
 
-  const unableToUseSGLT2 = egfr > 0 && egfr < 20;
+  const unableToUseSGLT2 = (egfr > 0 && egfr < 20) || onDialysis;
   if (highCVRisk && !hasGLP1 && unableToUseSGLT2) {
     recommendations.push({
       priority: 'MODERATE',

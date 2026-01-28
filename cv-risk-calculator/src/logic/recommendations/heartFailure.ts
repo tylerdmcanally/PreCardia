@@ -1,6 +1,7 @@
 import { PatientData, ClinicalCalculations, DomainRecommendation } from '../../types';
 import { GUIDELINES } from '../../data/guidelines';
 import { getSafetyRecommendationsForDomain, hasMRASafetyHold } from '../safety';
+import { getMedicationsByCategory, hasMedicationInCategory } from '../safety/utils';
 
 export function generateHeartFailureRecommendations(
   patientData: PatientData,
@@ -13,6 +14,7 @@ export function generateHeartFailureRecommendations(
   const { egfr } = calculations;
   const potassiumValue = patientData.labs.potassium ?? 0;
   const mraOnHold = hasMRASafetyHold(patientData, calculations);
+  const onDialysis = Boolean(history.dialysis);
 
   if (!history.heartFailure) {
     return recommendations;
@@ -23,15 +25,12 @@ export function generateHeartFailureRecommendations(
   const isHFmrEF = ejectionFraction > 40 && ejectionFraction <= 49;
 
   // Check current medications
-  const hasACEI = medications.some((m) => m.category === 'ACE Inhibitor');
-  const hasARB = medications.some((m) => m.category === 'ARB');
-  const hasARNI = medications.some((m) =>
-    m.genericName.toLowerCase().includes('sacubitril') ||
-    m.genericName.toLowerCase().includes('entresto')
-  );
-  const hasBetaBlocker = medications.some((m) => m.category === 'Beta Blocker');
-  const hasMRA = medications.some((m) => m.category === 'MRA');
-  const hasSGLT2i = medications.some((m) => m.category === 'Diabetes - SGLT2i');
+  const hasACEI = hasMedicationInCategory(medications, 'ACE Inhibitor');
+  const hasARB = hasMedicationInCategory(medications, 'ARB');
+  const hasARNI = hasMedicationInCategory(medications, 'ARNI');
+  const hasBetaBlocker = hasMedicationInCategory(medications, 'Beta Blocker');
+  const hasMRA = hasMedicationInCategory(medications, 'MRA');
+  const hasSGLT2i = hasMedicationInCategory(medications, 'Diabetes - SGLT2i');
   const hasHydralazine = medications.some((m) => m.genericName.toLowerCase().includes('hydralazine'));
   const hasIsosorbide = medications.some(
     (m) =>
@@ -57,7 +56,7 @@ export function generateHeartFailureRecommendations(
     }
 
     if (isHFmrEF) {
-      if (!hasSGLT2i && egfr >= 20) {
+      if (!hasSGLT2i && egfr >= 20 && !onDialysis) {
         recommendations.push({
           priority: 'HIGH',
           action: 'ADD',
@@ -66,6 +65,16 @@ export function generateHeartFailureRecommendations(
           rationale: `HFmrEF (EF ${ejectionFraction}%): SGLT2 inhibitors carry Class 2a recommendation to reduce HF admissions and CV death.`,
           evidence: GUIDELINES.HF_2022,
           monitoring: 'Monitor renal function and volume status; educate on genital mycotic infection risk.',
+        });
+      } else if (!hasSGLT2i && onDialysis) {
+        recommendations.push({
+          priority: 'HIGH',
+          action: 'DEFER',
+          medication: 'SGLT2i (Dapagliflozin/Empagliflozin)',
+          recommendedDose: 'N/A',
+          rationale: 'SGLT2 inhibitors have no evidence or labeling support in dialysis-dependent patients; avoid initiation.',
+          evidence: GUIDELINES.HF_2022,
+          monitoring: 'Optimize other HF therapies (ARNI/ACEI/ARB, beta blocker, MRA if safe) and reassess if off dialysis.',
         });
       }
       if (!hasRAASi) {
@@ -111,7 +120,7 @@ export function generateHeartFailureRecommendations(
       });
     } else {
       // HFpEF
-      if (!hasSGLT2i && egfr >= 20) {
+      if (!hasSGLT2i && egfr >= 20 && !onDialysis) {
         recommendations.push({
           priority: 'HIGH',
           action: 'ADD',
@@ -120,6 +129,16 @@ export function generateHeartFailureRecommendations(
           rationale: `HFpEF (EF ${ejectionFraction}%): SGLT2 inhibitors (Class 2a) reduce HF hospitalizations (EMPEROR-Preserved, DELIVER).`,
           evidence: GUIDELINES.HF_2022,
           monitoring: 'Monitor renal function and volume status; counsel on transient eGFR dip.',
+        });
+      } else if (!hasSGLT2i && onDialysis) {
+        recommendations.push({
+          priority: 'HIGH',
+          action: 'DEFER',
+          medication: 'SGLT2i (Empagliflozin/Dapagliflozin)',
+          recommendedDose: 'N/A',
+          rationale: 'SGLT2 inhibitors are not recommended in ESKD on dialysis; focus on volume/BP control and GDMT pillars that remain safe.',
+          evidence: GUIDELINES.HF_2022,
+          monitoring: 'Reassess candidacy only if kidney function recovers above eGFR threshold.',
         });
       }
       if (!hasMRA && egfr >= 30 && potassiumValue < 5 && !mraOnHold) {
@@ -164,7 +183,7 @@ export function generateHeartFailureRecommendations(
 
   // HIGH PRIORITY: Switch from ACE-I to ARNI requires DISCONTINUING ACE-I first
   if (!hasARNI && hasACEI && egfr >= 30) {
-    const aceInhibitor = medications.find((m) => m.category === 'ACE Inhibitor');
+    const aceInhibitor = getMedicationsByCategory(medications, ['ACE Inhibitor'])[0];
 
     // Step 1: DISCONTINUE ACE-I (separate prominent recommendation)
     recommendations.push({
@@ -190,7 +209,7 @@ export function generateHeartFailureRecommendations(
       additionalNotes: 'PARADIGM-HF trial: Entresto superior to enalapril for HFrEF. Must have stopped ACE-I ≥36 hours prior. Uptitrate every 2-4 weeks as tolerated.',
     });
   } else if (!hasARNI && hasARB && !hasACEI && egfr >= 30) {
-    const arb = medications.find((m) => m.category === 'ARB');
+    const arb = getMedicationsByCategory(medications, ['ARB'])[0];
     recommendations.push({
       priority: 'HIGH',
       action: 'SWITCH',
@@ -255,28 +274,42 @@ export function generateHeartFailureRecommendations(
   }
 
   // HIGH PRIORITY: SGLT2i for HFrEF (Pillar 4 of GDMT - Class 1a regardless of diabetes)
-  if (!hasSGLT2i && egfr > 0 && egfr < 20) {
-    recommendations.push({
-      priority: 'HIGH',
-      action: 'DEFER',
-      medication: 'SGLT2i (Dapagliflozin/Empagliflozin)',
-      recommendedDose: 'N/A',
-      rationale: `HFrEF requires SGLT2i as part of four-pillar GDMT, but NOT INDICATED: eGFR ${egfr.toFixed(0)} mL/min/1.73m2 <20. SGLT2i not indicated for HF when eGFR <20.`,
-      evidence: '2022 AHA/ACC/HFSA Heart Failure Guidelines',
-      monitoring: 'Optimize other three pillars of GDMT (ARNI, beta-blocker, MRA). Consider nephrology referral. Reassess SGLT2i if eGFR improves.',
-      additionalNotes: 'SGLT2i significantly reduces HF hospitalization and CV death but efficacy/safety not established in severe CKD (eGFR <20) for HF indication.',
-    });
-  } else if (!hasSGLT2i && egfr >= 20) {
-    recommendations.push({
-      priority: 'HIGH',
-      action: 'ADD',
-      medication: 'Dapagliflozin',
-      recommendedDose: '10mg daily',
-      rationale: `HFrEF (EF ${ejectionFraction}%): SGLT2i is fourth pillar of GDMT per 2022 guidelines (Class 1a); reduces CV death and HF hospitalization by 26% regardless of diabetes status`,
-      evidence: '2022 AHA/ACC/HFSA Heart Failure Guidelines',
-      monitoring: 'Monitor for genital mycotic infections (10-15%); eGFR may dip 3-5 points initially (expected hemodynamic effect, beneficial long-term). Monitor for volume depletion, DKA (rare).',
-      additionalNotes: 'DAPA-HF trial: benefit in diabetic AND non-diabetic patients. Empagliflozin also Class 1a. Can use down to eGFR 20. CONTRAINDICATIONS: Type 1 diabetes (not FDA-approved), history of DKA. Stop 3 days before surgery to prevent DKA.',
-    });
+  if (!hasSGLT2i) {
+    if (onDialysis) {
+      recommendations.push({
+        priority: 'HIGH',
+        action: 'DEFER',
+        medication: 'SGLT2i (Dapagliflozin/Empagliflozin)',
+        recommendedDose: 'N/A',
+        rationale:
+          'HFrEF pillar therapy includes SGLT2i, but these agents are not studied or labeled for patients on dialysis; avoid initiation.',
+        evidence: '2022 AHA/ACC/HFSA Heart Failure Guidelines',
+        monitoring:
+          'Optimize ARNI/ACEI/ARB, beta-blocker, and MRA (if safe) instead. Reassess only if kidney function recovers above eGFR 20.',
+      });
+    } else if (egfr > 0 && egfr < 20) {
+      recommendations.push({
+        priority: 'HIGH',
+        action: 'DEFER',
+        medication: 'SGLT2i (Dapagliflozin/Empagliflozin)',
+        recommendedDose: 'N/A',
+        rationale: `HFrEF requires SGLT2i as part of four-pillar GDMT, but NOT INDICATED: eGFR ${egfr.toFixed(0)} mL/min/1.73m2 <20. SGLT2i not indicated for HF when eGFR <20.`,
+        evidence: '2022 AHA/ACC/HFSA Heart Failure Guidelines',
+        monitoring: 'Optimize other three pillars of GDMT (ARNI, beta-blocker, MRA). Consider nephrology referral. Reassess SGLT2i if eGFR improves.',
+        additionalNotes: 'SGLT2i significantly reduces HF hospitalization and CV death but efficacy/safety not established in severe CKD (eGFR <20) for HF indication.',
+      });
+    } else if (egfr >= 20) {
+      recommendations.push({
+        priority: 'HIGH',
+        action: 'ADD',
+        medication: 'Dapagliflozin',
+        recommendedDose: '10mg daily',
+        rationale: `HFrEF (EF ${ejectionFraction}%): SGLT2i is fourth pillar of GDMT per 2022 guidelines (Class 1a); reduces CV death and HF hospitalization by 26% regardless of diabetes status`,
+        evidence: '2022 AHA/ACC/HFSA Heart Failure Guidelines',
+        monitoring: 'Monitor for genital mycotic infections (10-15%); eGFR may dip 3-5 points initially (expected hemodynamic effect, beneficial long-term). Monitor for volume depletion, DKA (rare).',
+        additionalNotes: 'DAPA-HF trial: benefit in diabetic AND non-diabetic patients. Empagliflozin also Class 1a. Can use down to eGFR 20. CONTRAINDICATIONS: Type 1 diabetes (not FDA-approved), history of DKA. Stop 3 days before surgery to prevent DKA.',
+      });
+    }
   }
 
   if (

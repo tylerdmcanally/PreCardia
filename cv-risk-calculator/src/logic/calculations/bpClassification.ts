@@ -45,18 +45,14 @@ export function determineBPTarget(params: {
   ascvdRisk?: number;
 }): { systolic: number; diastolic: number; rationale: string } {
   const { hasASCVD, hasDiabetes, hasCKD, ascvdRisk } = params;
-
-  if (hasASCVD || hasDiabetes || hasCKD || (ascvdRisk && ascvdRisk >= 10)) {
-    return {
-      systolic: 130,
-      diastolic: 80,
-      rationale: 'Target <130/80 per 2017 ACC/AHA (high CV risk or clinical ASCVD)',
-    };
-  }
+  const isHighRiskByPREVENT = typeof ascvdRisk === 'number' && ascvdRisk >= 7.5;
+  const highRiskOrClinical = hasASCVD || hasDiabetes || hasCKD || isHighRiskByPREVENT;
 
   return {
     systolic: 130,
     diastolic: 80,
-    rationale: 'Target <130/80 per 2017 ACC/AHA guideline',
+    rationale: highRiskOrClinical
+      ? 'Target <130/80 per 2025 AHA/ACC HTN guideline (clinical CVD/diabetes/CKD or PREVENT 10-year CVD risk ≥7.5%).'
+      : 'Target <130/80 per 2025 AHA/ACC HTN guideline for all adults; individualize if frailty/limited life expectancy.',
   };
 }

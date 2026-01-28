@@ -1,5 +1,6 @@
 import { PatientData, ClinicalCalculations, DomainRecommendation } from '../../types';
 import { GUIDELINES } from '../../data/guidelines';
+import { getMedicationsByCategory } from '../safety/utils';
 
 export function generateLipidRecommendations(
   patientData: PatientData,
@@ -14,7 +15,7 @@ export function generateLipidRecommendations(
   const ldl = labs.ldl || 0;
   const triglycerides = labs.triglycerides || 0;
 
-  const currentStatin = medications.find((m) => m.category === 'Statin');
+  const currentStatin = getMedicationsByCategory(medications, ['Statin'])[0];
   const hasEzetimibe = medications.some((m) => m.genericName.toLowerCase().includes('ezetimibe'));
   const hasPCSK9 = medications.some((m) =>
     ['evolocumab', 'alirocumab', 'inclisiran'].some((agent) =>
