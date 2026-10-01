@@ -117,15 +117,22 @@ src/
 
 ## Deployment
 
-### Vercel
-This project is configured for deployment on Vercel with the included `vercel.json` configuration.
+### GitHub Pages
+
+The primary site is [CardioTools on GitHub Pages](https://tylerdmcanally.github.io/PreCardia/). Pushes to `main` run the regression tests, build the app and deploy through [the Pages workflow](../.github/workflows/pages.yml). Pull requests build and test without deploying.
+
+For a local Pages preview:
 
 ```bash
-vercel deploy
+npm run build:pages
+npm run preview:pages
 ```
 
-### Other Platforms
-The production build in the `dist/` directory is a static site that can be deployed to any static hosting service (Netlify, AWS S3, GitHub Pages, etc.).
+Open `http://localhost:4173/PreCardia/`. Pages links use `#/precardia` and `#/prevent-calculator` so refreshes and direct links work on static hosting. See [the deployment guide](../DEPLOYMENT.md) for setup and verification.
+
+### Other hosts
+
+`npm run build` retains root-based browser routing for hosts with SPA rewrites. The prior Vercel configuration remains available in `vercel.json`.
 
 ## Clinical Disclaimer
 
