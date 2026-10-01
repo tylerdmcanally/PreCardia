@@ -69,3 +69,11 @@ The legacy AUC dataset is a different source and has not been validated by this 
 - ESLint **passed for changed TypeScript/TSX files**. Full repository lint still reports three pre-existing violations outside this update in `CVRiskCalculator.tsx` (unused `Sparkles`), `logic/calculations/index.ts` (`any`) and `logic/safety/utils.ts` (`any`). Two legacy imaging lint errors were cleaned up in the touched module.
 
 These checks validate programmed behavior and software integration. They do not constitute external clinical validation of the decision aid. No deployment is included in this change.
+
+## Version 1.2.0 usability follow-up
+
+The assessment now follows six steps: patient/surgery, cardiac conditions, interventions/devices, functional capacity, medications/labs, and review/report. Desktop step navigation and a mobile step selector allow direct editing without losing entries. Stroke, PCI, medication and unlisted-procedure follow-up fields appear alongside their parent inputs. Clinical recommendation logic is unchanged.
+
+Required-field errors appear in the page with links that focus the relevant control. Final validation returns to an earlier step when necessary. The review screen lists selected conditions, interventions, medications and lab values, with direct edit links. Any input change clears the old report; users must regenerate before copying or printing. Clipboard success/failure uses in-page feedback. Fields have associated labels, keyboard focus indicators and larger touch targets. Assessment data remains in component memory only.
+
+Verification: the production build, changed-file ESLint check and all 80 clinical regression tests passed. A synthetic case was entered through all six steps and retained its DASI score/classification, PCI timing, stroke guidance, HFrEF medication advice and lab values in the generated report. Browser checks covered required-field focus, cross-step validation, direct editing, stale-report removal, regeneration with changed age, clipboard feedback and mobile step selection at 390 px without horizontal page overflow. Print-to-PDF contained the report and excluded the form/navigation. No browser JavaScript errors were observed. The three previously documented unrelated lint violations remain outside this change.

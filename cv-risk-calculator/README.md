@@ -142,6 +142,12 @@ This project is for medical education and clinical decision support purposes.
 
 ## Version History
 
+### Version 1.2.0 — October 1, 2026
+- Replace the long PreCardia accordion page with six navigable steps: patient/surgery, conditions, interventions/devices, function, medications/labs, and review/report.
+- Keep related follow-up fields beside their parent inputs; add a review summary with direct edit links.
+- Replace popup validation and clipboard alerts with accessible in-page feedback. Validation links focus the affected field, and changing any answer invalidates the previous report.
+- Improve field labels, keyboard focus, mobile layouts and touch targets. Assessment data stays in component memory only; refreshing or leaving the page clears it.
+
 ### Version 1.1.0 — October 1, 2026
 - Align PreCardia decision logic and reports with the reaffirmed 2026 perioperative guideline; see the [source-to-code audit](../docs/PERIOPERATIVE_2026_ALIGNMENT.md).
 - Correct DASI/testing eligibility, PCI timing, biomarkers, medication guidance, RCRI reporting and eGFR calculation.

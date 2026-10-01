@@ -4,9 +4,13 @@ import { version } from '../../package.json';
 export const CURRENT_RELEASE = {
   version,
   date: 'October 1, 2026',
-  title: 'PreCardia: 2026 guideline alignment',
-  summary: 'The 2026 AHA/ACC publication reaffirms the 2024 recommendations. This release corrects how PreCardia applies those recommendations.',
+  title: 'A clearer PreCardia assessment',
+  summary: 'Work through the assessment in six steps, with related questions together and a review before generating your report. This release also includes the guideline corrections introduced in v1.1.0; the 2026 publication reaffirms the 2024 recommendations.',
   changes: [
+    {
+      title: 'Guided steps and easier editing',
+      description: 'Start with the patient and planned surgery, then review conditions, interventions, function, medications and labs. Move freely between steps, follow field-specific validation links, and edit entries from the review screen. Reports must be regenerated after answers change.',
+    },
     {
       title: 'Functional capacity and testing',
       description: 'DASI scores of 34 or less indicate poor capacity, even when estimated METs exceed 4. Stress testing and CCTA now follow one consistent pathway based on risk, capacity, clinical stability and surgical urgency.',

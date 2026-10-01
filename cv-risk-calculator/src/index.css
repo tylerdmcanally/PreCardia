@@ -8,6 +8,33 @@
   }
 }
 
+.precardia-assessment button:focus-visible,
+.precardia-assessment a:focus-visible,
+.precardia-assessment select:focus-visible,
+.precardia-assessment input:focus-visible,
+.precardia-assessment pre:focus-visible {
+  outline: 2px solid #2c3e50;
+  outline-offset: 3px;
+}
+
+.precardia-assessment [aria-invalid="true"] {
+  border-color: #b91c1c;
+}
+
+.precardia-assessment button,
+.precardia-assessment label:has(> input[type="checkbox"]),
+.precardia-assessment label:has(> input[type="radio"]) {
+  min-height: 44px;
+}
+
+.precardia-assessment input[type="checkbox"],
+.precardia-assessment input[type="radio"] {
+  accent-color: #2c3e50;
+  flex-shrink: 0;
+  width: 1rem;
+  height: 1rem;
+}
+
 @media print {
   @page {
     margin: 0.5in;
