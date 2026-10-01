@@ -19,7 +19,7 @@ export interface MedicalHistory {
   cad: boolean;
   priorMI: boolean;
   priorPCI: boolean;
-  pciTiming?: '<3 months' | '3-6 months' | '6-12 months' | '>12 months';
+  pciTiming?: 'unknown' | '<3 months' | '3-6 months' | '6-12 months' | '>12 months';
   stroke: boolean;
   tia: boolean;
   pad: boolean;
@@ -27,6 +27,7 @@ export interface MedicalHistory {
   heartFailure: boolean;
   ejectionFraction?: number;
   atrialFibrillation: boolean;
+  afValveStatus?: 'unknown' | 'none' | 'mechanical' | 'mitral-stenosis';
 }
 
 export type MedicationCategory =

@@ -1,4 +1,5 @@
-import { Allergy, Medication, MedicationCategory } from '../../types';
+import { MEDICATIONS } from '../../data/medications';
+import { Allergy, Medication, MedicationCategory, DomainRecommendation } from '../../types';
 
 const CATEGORY_KEYWORDS: Partial<Record<MedicationCategory, string[]>> = {
   'ACE Inhibitor': [
@@ -96,12 +97,13 @@ function normalize(value: string | undefined): string {
 }
 
 function medicationMatchesCategory(medication: Medication, category: MedicationCategory): boolean {
+  if (category === 'ARB' && /sacubitril|entresto/i.test(medication.genericName)) return false;
   if (medication.category === category) return true;
   const keywords = CATEGORY_KEYWORDS[category];
   if (!keywords) return false;
 
   const generic = normalize(medication.genericName);
-  const name = normalize((medication as any).name || '');
+  const name = normalize((medication as Medication & { name?: string }).name || '');
   return keywords.some((keyword) => generic.includes(keyword) || name.includes(keyword));
 }
 export function hasMedicationInCategory(medications: Medication[], category: MedicationCategory): boolean {
@@ -109,8 +111,8 @@ export function hasMedicationInCategory(medications: Medication[], category: Med
 }
 
 export function hasAllergyToCategory(allergies: Allergy[], category: MedicationCategory): boolean {
-  const keywords = CATEGORY_KEYWORDS[category];
-  if (!keywords || allergies.length === 0) {
+  const keywords = [...(CATEGORY_KEYWORDS[category] ?? []), ...MEDICATIONS.filter(m => m.category === category).flatMap(m => [m.genericName, ...m.brandNames, ...(m.aliases ?? [])]).map(normalize)];
+  if (keywords.length === 0 || allergies.length === 0) {
     return false;
   }
   return allergies.some((allergy) => {
@@ -255,4 +257,22 @@ export function getDiureticMedications(medications: Medication[]): Medication[] 
     const generic = normalize(medication.genericName);
     return DIURETIC_KEYWORDS.some((keyword) => generic.includes(keyword));
   });
+}
+
+/** Flag potential cross-class allergies for review; do not assert that all class members are contraindicated. */
+export function guardProposedTherapy(recommendation: DomainRecommendation, allergies: Allergy[]): DomainRecommendation {
+  if (!['ADD', 'INCREASE', 'SWITCH', 'CONSIDER'].includes(recommendation.action) || !allergies.length) return recommendation;
+  const proposal = `${recommendation.medication} ${recommendation.recommendedDose ?? ''}`.toLowerCase();
+  const categories = new Set(MEDICATIONS.filter(m => [m.genericName, m.name, ...m.brandNames].some(name => proposal.includes(name.toLowerCase()))).map(m => m.category));
+  for (const [category, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
+    if (keywords?.some(keyword => proposal.includes(keyword))) categories.add(category as MedicationCategory);
+  }
+  const directMatch = allergies.some(a => a.medication.trim().length > 2 && proposal.includes(a.medication.toLowerCase().trim()));
+  if (!directMatch && ![...categories].some(category => hasAllergyToCategory(allergies, category))) return recommendation;
+  return {
+    ...recommendation, action: 'EVALUATE', currentDose: undefined, recommendedDose: undefined,
+    rationale: `A documented drug or related-class allergy requires review before this treatment option. ${recommendation.rationale}`,
+    monitoring: 'Clarify the culprit drug, reaction and possible alternatives before prescribing; do not initiate or escalate from this report.',
+    additionalNotes: undefined,
+  };
 }

@@ -14,6 +14,7 @@ import {
   getNSAIDMedications,
   poundsToKilograms,
   RAAS_CATEGORIES,
+  hasAllergyToAnyCategory,
 } from './utils';
 
 export function getContraindicationAlerts(
@@ -39,34 +40,24 @@ export function getContraindicationAlerts(
         rationale: `SEVERE HYPERKALEMIA: K+ ${potassium.toFixed(1)} mEq/L while on RAAS inhibition. Risk of life-threatening arrhythmia.`,
         evidence: GUIDELINES.BP_2025,
         monitoring:
-          'HOLD all ACE-I/ARB/ARNI agents. Recheck BMP in 3-5 days after addressing reversible causes (diet, K+ supplements, renal function).',
+          'Promptly assess and confirm hyperkalemia, including ECG/urgent treatment when indicated. Review reversible causes and the RAAS plan; do not defer severe hyperkalemia to routine follow-up.',
         additionalNotes:
           'Consider potassium binder (patiromer or SZC) and nephrology consultation to maintain GDMT once potassium is controlled.',
       },
     });
   }
 
-  if (raasMedications.length > 0 && egfr > 0 && egfr < 30) {
-    alerts.push({
-      domain: 'BLOOD_PRESSURE',
-      source: 'CONTRAINDICATION',
-      recommendation: {
-        priority: 'HIGH',
-        action: 'ADJUST',
-        medication: formatMedicationLabel(firstRAASMedication, 'RAAS inhibitor'),
-        recommendedDose: 'N/A',
-        rationale: `ADVANCED CKD: eGFR ${egfr.toFixed(0)} mL/min/1.73m2 on RAAS inhibition. High risk of acute kidney injury and hyperkalemia.`,
-        evidence: GUIDELINES.BP_2025,
-        monitoring:
-          'Close monitoring required: check BMP weekly for 1 month, then monthly. Hold if creatinine increases >30% from baseline or potassium >5.5.',
-        additionalNotes:
-          'Evaluate for nephrology referral and potassium binder support. Consider lower dosing or alternative strategies if renal function declines further.',
-      },
-    });
+  if (raasMedications.length > 0 && egfr !== null && egfr < 30) {
+    alerts.push({ domain: 'BLOOD_PRESSURE', source: 'CONTRAINDICATION', recommendation: {
+      priority: 'HIGH', action: 'EVALUATE', medication: formatMedicationLabel(firstRAASMedication, 'RAAS inhibitor'),
+      rationale: `eGFR ${egfr.toFixed(0)} on RAAS therapy: review renal trajectory, potassium and tolerability. A low eGFR alone is not a reason to stop established ACE-I/ARB therapy.`,
+      evidence: GUIDELINES.CKD_2024,
+      monitoring: 'Assess acute kidney injury, symptomatic hypotension or uncontrolled hyperkalemia. Review a creatinine rise >30% within 4 weeks of initiation/increase and reversible causes before changing treatment; individualize follow-up with nephrology.',
+    } });
   }
 
   const metformin = getMetformin(patientData.medications);
-  if (metformin && (onDialysis || (egfr > 0 && egfr < 30))) {
+  if (metformin && (onDialysis || (egfr !== null && egfr < 30))) {
     alerts.push({
       domain: 'DIABETES_CARDIORENAL',
       source: 'CONTRAINDICATION',
@@ -75,11 +66,11 @@ export function getContraindicationAlerts(
         action: 'DISCONTINUE',
         medication: formatMedicationLabel(metformin, 'Metformin'),
         recommendedDose: 'N/A',
-        rationale: `CONTRAINDICATED: Metformin with ${onDialysis ? 'dialysis-dependent CKD' : `eGFR ${egfr.toFixed(0)} mL/min/1.73m2`}. Elevated risk of lactic acidosis.`,
-        evidence: GUIDELINES.ADA_2024,
+        rationale: `CONTRAINDICATED: Metformin with ${onDialysis ? 'dialysis-dependent CKD' : `eGFR ${egfr?.toFixed(0) ?? 'unknown'} mL/min/1.73m2`}. Elevated risk of lactic acidosis.`,
+        evidence: GUIDELINES.ADA_2026,
         monitoring:
           'Discontinue immediately. Recheck renal function in 1 week. Transition to alternate therapy (consider insulin, GLP-1 RA, or DPP-4 inhibitor).',
-        additionalNotes: 'Metformin is contraindicated when eGFR <30 or once dialysis is initiated. If eGFR improves to ≥30 off dialysis, reassess candidacy at reduced dosing.',
+        additionalNotes: 'Metformin is contraindicated when eGFR <30 or once dialysis is initiated. Reassess only after recovery and review current US initiation criteria; new initiation is not recommended below eGFR 45.',
       },
     });
   }
@@ -95,7 +86,7 @@ export function getContraindicationAlerts(
         medication: describeMedicationList(sglt2Medications, 'SGLT2 inhibitor'),
         recommendedDose: 'N/A',
         rationale:
-          'SGLT2 inhibitors are not recommended once a patient is dialysis-dependent; no glycemic or cardio-renal benefit and potential for adverse effects.',
+          'SGLT2 inhibitors are not recommended once a patient is dialysis-dependent; benefit and safety on dialysis are not established.',
         evidence: `${GUIDELINES.KDIGO_2022}; ${GUIDELINES.CKD_2024}`,
         monitoring: 'Stop agent and monitor volume status/glucose. Reassess regimen with nephrology/endocrinology.',
         additionalNotes: 'KDIGO/ADA recommend stopping SGLT2i when dialysis starts.',
@@ -185,7 +176,7 @@ export function getContraindicationAlerts(
     }
   }
 
-  const mraMedications = getMRAMedications(patientData.medications);
+  const mraMedications = getMRAMedications(patientData.medications).filter(m => !/finerenone/i.test(m.genericName));
   if (mraMedications.length > 0) {
     const targetMeds = describeMedicationList(mraMedications, 'MRA');
     if (potassium >= 5.5) {
@@ -200,7 +191,7 @@ export function getContraindicationAlerts(
           rationale: `SEVERE HYPERKALEMIA: K+ ${potassium.toFixed(1)} mEq/L on MRA therapy.`,
           evidence: GUIDELINES.HF_2022,
           monitoring:
-            'Hold MRA immediately. Reassess potassium within 48-72 hours. Resume only when K+ <5.0 and underlying factors addressed.',
+            'Hold MRA and promptly assess hyperkalemia; determine reassessment timing from severity and clinical/ECG findings. Resume only when K+ <5.0 and underlying factors addressed.',
           additionalNotes:
             'Evaluate diet, diuretic regimen, and consider potassium binder therapy. Persistent hyperkalemia warrants cardiology/nephrology input.',
         },
@@ -223,7 +214,7 @@ export function getContraindicationAlerts(
       });
     }
 
-    if (egfr > 0 && egfr < 30) {
+    if (egfr !== null && egfr < 30) {
       alerts.push({
         domain: 'HEART_FAILURE',
         source: 'CONTRAINDICATION',
@@ -232,7 +223,7 @@ export function getContraindicationAlerts(
           action: 'DISCONTINUE',
           medication: targetMeds,
           recommendedDose: 'N/A',
-          rationale: `CONTRAINDICATED: eGFR ${egfr.toFixed(0)} mL/min/1.73m2 on MRA therapy. High risk of life-threatening hyperkalemia.`,
+          rationale: `CONTRAINDICATED: eGFR ${egfr?.toFixed(0) ?? 'unknown'} mL/min/1.73m2 on MRA therapy. High risk of life-threatening hyperkalemia.`,
           evidence: GUIDELINES.HF_2022,
           monitoring:
             'Discontinue MRA. Monitor renal function and potassium periodically. Reassess candidacy if renal function improves above threshold.',
@@ -243,25 +234,18 @@ export function getContraindicationAlerts(
   }
 
   const doacMedications = getDOACMedications(patientData.medications);
-  if (doacMedications.length > 0 && ((egfr > 0 && egfr < 15) || onDialysis)) {
-    const medicationList = describeMedicationList(doacMedications, 'DOAC');
-    alerts.push({
-      domain: 'ANTIPLATELET_ANTICOAGULATION',
-      source: 'CONTRAINDICATION',
-      recommendation: {
-        priority: 'HIGH',
-        action: 'DISCONTINUE',
-        medication: medicationList,
-        recommendedDose: 'N/A',
-        rationale: `CONTRAINDICATED: DOAC with ${onDialysis ? 'dialysis-dependent CKD' : `eGFR ${egfr.toFixed(0)} mL/min/1.73m2`}. Drug accumulation leads to life-threatening bleeding risk.`,
-        evidence: GUIDELINES.AFIB_2019,
-        monitoring:
-          'Stop DOAC immediately. Consider transition to warfarin with INR monitoring or left atrial appendage closure. Consult cardiology/hematology.',
-        additionalNotes:
-          'Apixaban, rivaroxaban, edoxaban, and dabigatran all require renal clearance and are not recommended in severe renal failure.',
-      },
-    });
+  if (doacMedications.length > 0 && ((egfr !== null && egfr < 15) || onDialysis)) {
+    alerts.push({domain: 'ANTIPLATELET_ANTICOAGULATION', source: 'CONTRAINDICATION', recommendation: {
+      priority: 'HIGH', action: 'EVALUATE', medication: describeMedicationList(doacMedications, 'Anticoagulant'),
+      rationale: 'Severe kidney disease/dialysis requires an individualized, agent-specific anticoagulation plan. Warfarin or evidence-based apixaban may be reasonable for selected AF patients; do not automatically stop all DOACs.',
+      evidence: GUIDELINES.AFIB_2023,
+      monitoring: 'Confirm indication, renal trajectory, dose, interactions and bleeding risk with the treating team. Avoid unplanned interruption of stroke-prevention therapy.',
+    }});
   }
+  if (finerenone && potassium > 5.5) alerts.push({domain:'DIABETES_CARDIORENAL',source:'CONTRAINDICATION',recommendation:{
+    priority:'HIGH', action:'HOLD', medication:'Finerenone', rationale:'Potassium >5.5 on finerenone requires withholding treatment and reassessment per US labeling.',
+    evidence:GUIDELINES.DRUG_LABELS, monitoring:'Assess the hyperkalemia promptly and follow the indication-specific restart criteria after correction.',
+  }});
 
   const prasugrel = findMedicationByKeywords(patientData.medications, ['prasugrel']);
   if (prasugrel) {
@@ -311,19 +295,16 @@ export function getContraindicationAlerts(
 }
 
 export function hasRAASSafetyHold(patientData: PatientData, calculations: ClinicalCalculations): boolean {
-  const potassium = patientData.labs.potassium ?? 0;
-  const egfr = calculations.egfr;
-  if (patientData.history.dialysis) return true;
-  if (potassium > 5.5) return true;
-  if (egfr > 0 && egfr < 30) return true;
-  return false;
+  const potassium = patientData.labs.potassium;
+  if (potassium === undefined || !Number.isFinite(potassium) || calculations.egfr === null) return true;
+  if (patientData.history.dialysis || potassium >= 5.0) return true;
+  if (hasAllergyToAnyCategory(patientData.allergies, ['ACE Inhibitor', 'ARB', 'ARNI'])) return true;
+  return calculations.egfr < 30;
 }
 
 export function hasMRASafetyHold(patientData: PatientData, calculations: ClinicalCalculations): boolean {
-  const potassium = patientData.labs.potassium ?? 0;
-  const egfr = calculations.egfr;
-  if (patientData.history.dialysis) return true;
-  if (potassium >= 5.0) return true;
-  if (egfr > 0 && egfr < 30) return true;
-  return false;
+  const potassium = patientData.labs.potassium;
+  if (potassium === undefined || !Number.isFinite(potassium) || calculations.egfr === null) return true;
+  return Boolean(patientData.history.dialysis) || potassium >= 5.0 || calculations.egfr <= 30
+    || hasAllergyToAnyCategory(patientData.allergies, ['MRA']);
 }

@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { PatientData, Medication, Allergy, MedicationCategory, DomainName, ClinicalReport } from './types';
+import { PatientData, Medication, Allergy, MedicationCategory, DomainName, ClinicalCalculations } from './types';
 import { performClinicalCalculations } from './logic/calculations';
 import { generateClinicalReport } from './logic/report/generateReport';
 import { formatReportAsText } from './logic/report/formatReport';
 import { MedicationAutocomplete } from './components/MedicationAutocomplete';
+import { validateCVPatient } from './logic/validation';
 import { MEDICATIONS } from './data/medications';
 import {
   Activity,
@@ -17,17 +18,16 @@ import {
   ChevronUp,
   Copy,
   Printer,
-  Sparkles,
   ArrowLeft,
 } from 'lucide-react';
 
 type RaceOption = 'white' | 'black' | 'hispanic' | 'asian' | 'other';
 type SmokingStatusOption = 'current' | 'former' | 'never';
-type PciTimingOption = '<3 months' | '3-6 months' | '6-12 months' | '>12 months';
+type PciTimingOption = 'unknown' | '<3 months' | '3-6 months' | '6-12 months' | '>12 months';
 
 export function CVRiskCalculator() {
   const [report, setReport] = useState<string | null>(null);
-  const [fullReport, setFullReport] = useState<ClinicalReport | null>(null);
+  const [reportContext, setReportContext] = useState<{ patient: PatientData; calculations: ClinicalCalculations } | null>(null);
   const [selectedDomains, setSelectedDomains] = useState<Set<DomainName>>(new Set([
     'BLOOD_PRESSURE',
     'LIPID_MANAGEMENT',
@@ -75,13 +75,14 @@ export function CVRiskCalculator() {
   const [cad, setCad] = useState(false);
   const [priorMI, setPriorMI] = useState(false);
   const [priorPCI, setPriorPCI] = useState(false);
-  const [pciTiming, setPciTiming] = useState<PciTimingOption>('<3 months');
+  const [pciTiming, setPciTiming] = useState<PciTimingOption>('unknown');
   const [stroke, setStroke] = useState(false);
   const [tia, setTia] = useState(false);
   const [pad, setPad] = useState(false);
   const [heartFailure, setHeartFailure] = useState(false);
   const [ejectionFraction, setEjectionFraction] = useState<string>('');
   const [atrialFibrillation, setAtrialFibrillation] = useState(false);
+  const [afValveStatus, setAfValveStatus] = useState<NonNullable<PatientData['history']['afValveStatus']>>('unknown');
 
   // Labs
   const [creatinine, setCreatinine] = useState<string>('');
@@ -102,6 +103,15 @@ export function CVRiskCalculator() {
   const [medications, setMedications] = useState<Medication[]>([]);
   const [allergies, setAllergies] = useState<Allergy[]>([]);
   const [nkda, setNkda] = useState(false); // No Known Drug Allergies
+
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [generatedInputs, setGeneratedInputs] = useState<string | null>(null);
+  const inputSnapshot = JSON.stringify([age,sex,race,heightFeet,heightInches,weightLbs,smokingStatus,
+    hypertension,hyperlipidemia,diabetes,ckd,dialysis,cad,priorMI,priorPCI,pciTiming,stroke,tia,pad,
+    heartFailure,ejectionFraction,atrialFibrillation,afValveStatus,creatinine,potassium,totalCholesterol,
+    ldl,hdl,triglycerides,a1c,uacr,bpReadings,medications,allergies,nkda]);
+  const reportIsCurrent = generatedInputs === inputSnapshot;
+  const optionalNumber = (value: string) => value.trim() === '' ? undefined : Number(value);
 
   const onGenerateReport = () => {
     // Validate allergies - must have both medication and reaction if not NKDA
@@ -137,42 +147,43 @@ export function CVRiskCalculator() {
         pad,
         hyperlipidemia,
         heartFailure,
-        ejectionFraction: parseFloat(ejectionFraction) || undefined,
+        ejectionFraction: optionalNumber(ejectionFraction),
         atrialFibrillation,
+        afValveStatus: atrialFibrillation ? afValveStatus : undefined,
       },
       medications,
       allergies,
       labs: {
-        creatinine: parseFloat(creatinine) || undefined,
-        potassium: parseFloat(potassium) || undefined,
-        totalCholesterol: parseFloat(totalCholesterol) || undefined,
-        ldl: parseFloat(ldl) || undefined,
-        hdl: parseFloat(hdl) || undefined,
-        triglycerides: parseFloat(triglycerides) || undefined,
-        a1c: parseFloat(a1c) || undefined,
-        uacr: parseFloat(uacr) || undefined,
+        creatinine: optionalNumber(creatinine),
+        potassium: optionalNumber(potassium),
+        totalCholesterol: optionalNumber(totalCholesterol),
+        ldl: optionalNumber(ldl),
+        hdl: optionalNumber(hdl),
+        triglycerides: optionalNumber(triglycerides),
+        a1c: optionalNumber(a1c),
+        uacr: optionalNumber(uacr),
       },
-      bpReadings: bpReadings.map(reading => ({
+      bpReadings: bpReadings.filter(r => r.systolic.trim() !== '' || r.diastolic.trim() !== '').map(reading => ({
         systolic: parseFloat(reading.systolic) || 0,
         diastolic: parseFloat(reading.diastolic) || 0,
       })),
     };
 
+    const errors = validateCVPatient(patientData);
+    if (!nkda && allergies.length === 0) errors.push('Confirm no known drug allergies or enter the allergy history.');
+    setValidationErrors(errors);
+    if (errors.length) return;
     const calculations = performClinicalCalculations(patientData);
-    const clinicalReport = generateClinicalReport(patientData, calculations);
-    setFullReport(clinicalReport);
-
-    // Apply domain filter
-    const filteredReport = filterReportByDomains(clinicalReport, selectedDomains);
-    const formattedReport = formatReportAsText(filteredReport);
-    setReport(formattedReport);
+    setGeneratedInputs(inputSnapshot);
+    setReportContext({ patient: patientData, calculations });
+    setReport(formatReportAsText(generateClinicalReport(patientData, calculations, selectedDomains)));
   };
 
-  const filterReportByDomains = (clinicalReport: ClinicalReport, domains: Set<DomainName>): ClinicalReport => {
-    return {
-      ...clinicalReport,
-      domains: clinicalReport.domains.filter(domain => domains.has(domain.name)),
-    };
+  const updateReportDomains = (domains: Set<DomainName>) => {
+    setSelectedDomains(domains);
+    if (reportContext && reportIsCurrent) {
+      setReport(formatReportAsText(generateClinicalReport(reportContext.patient, reportContext.calculations, domains)));
+    }
   };
 
   const toggleDomain = (domainName: DomainName) => {
@@ -182,48 +193,21 @@ export function CVRiskCalculator() {
     } else {
       newSelection.add(domainName);
     }
-    setSelectedDomains(newSelection);
-
-    // Regenerate report with new filter if report already exists
-    if (fullReport) {
-      const filteredReport = filterReportByDomains(fullReport, newSelection);
-      const formattedReport = formatReportAsText(filteredReport);
-      setReport(formattedReport);
-    }
+    updateReportDomains(newSelection);
   };
 
-  const toggleAllDomains = () => {
-    if (selectedDomains.size === 6) {
-      // All selected, deselect all
-      setSelectedDomains(new Set());
-      if (fullReport) {
-        const filteredReport = filterReportByDomains(fullReport, new Set());
-        const formattedReport = formatReportAsText(filteredReport);
-        setReport(formattedReport);
-      }
-    } else {
-      // Some or none selected, select all
-      const allDomains = new Set<DomainName>([
-        'BLOOD_PRESSURE',
-        'LIPID_MANAGEMENT',
-        'DIABETES_CARDIORENAL',
-        'HEART_FAILURE',
-        'ANTIPLATELET_ANTICOAGULATION',
-        'RISK_FACTOR_MODIFICATION',
-      ]);
-      setSelectedDomains(allDomains);
-      if (fullReport) {
-        const filteredReport = filterReportByDomains(fullReport, allDomains);
-        const formattedReport = formatReportAsText(filteredReport);
-        setReport(formattedReport);
-      }
-    }
-  };
+  const toggleAllDomains = () => updateReportDomains(selectedDomains.size === 6 ? new Set() : new Set<DomainName>([
+    'BLOOD_PRESSURE', 'LIPID_MANAGEMENT', 'DIABETES_CARDIORENAL', 'HEART_FAILURE',
+    'ANTIPLATELET_ANTICOAGULATION', 'RISK_FACTOR_MODIFICATION',
+  ]));
 
-  const copyToClipboard = () => {
-    if (report) {
-      navigator.clipboard.writeText(report);
+  const copyToClipboard = async () => {
+    if (!report || !reportIsCurrent) return;
+    try {
+      await navigator.clipboard.writeText(report);
       alert('Report copied to clipboard!');
+    } catch {
+      alert('Unable to access the clipboard. Select and copy the report text manually.');
     }
   };
 
@@ -281,111 +265,6 @@ export function CVRiskCalculator() {
     );
   };
 
-  // Allergy medication autocomplete component
-  const AllergyMedicationAutocomplete = ({ value, onSelect, placeholder }: { value: string; onSelect: (medName: string) => void; placeholder?: string }) => {
-    const [searchTerm, setSearchTerm] = useState(value);
-    const [showSuggestions, setShowSuggestions] = useState(false);
-    const [selectedIndex, setSelectedIndex] = useState(-1);
-    const inputRef = useRef<HTMLInputElement>(null);
-    const dropdownRef = useRef<HTMLDivElement>(null);
-
-    // Create a flat list of unique medication names (generic + brand)
-    const allMedNames = MEDICATIONS.flatMap(med => [
-      med.name,
-      med.genericName,
-      ...med.brandNames
-    ]);
-
-    const filteredMeds = searchTerm.length > 0
-      ? [...new Set(allMedNames)].filter((name) =>
-          name.toLowerCase().includes(searchTerm.toLowerCase())
-        ).slice(0, 10)
-      : [];
-
-    useEffect(() => {
-      const handleClickOutside = (event: MouseEvent) => {
-        if (
-          dropdownRef.current &&
-          !dropdownRef.current.contains(event.target as Node) &&
-          inputRef.current &&
-          !inputRef.current.contains(event.target as Node)
-        ) {
-          setShowSuggestions(false);
-        }
-      };
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
-
-    const handleSelect = (medName: string) => {
-      onSelect(medName);
-      setSearchTerm(medName);
-      setShowSuggestions(false);
-      setSelectedIndex(-1);
-    };
-
-    const handleKeyDown = (e: React.KeyboardEvent) => {
-      if (!showSuggestions) return;
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        setSelectedIndex((prev) => (prev < filteredMeds.length - 1 ? prev + 1 : prev));
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        setSelectedIndex((prev) => (prev > 0 ? prev - 1 : -1));
-      } else if (e.key === 'Enter' && selectedIndex >= 0) {
-        e.preventDefault();
-        handleSelect(filteredMeds[selectedIndex]);
-      } else if (e.key === 'Escape') {
-        setShowSuggestions(false);
-        setSelectedIndex(-1);
-      }
-    };
-
-    return (
-      <div className="relative">
-        <input
-          ref={inputRef}
-          type="text"
-          value={searchTerm}
-          onChange={(e) => {
-            setSearchTerm(e.target.value);
-            setShowSuggestions(true);
-            setSelectedIndex(-1);
-          }}
-          onFocus={() => {
-            if (searchTerm.length > 0) {
-              setShowSuggestions(true);
-            }
-          }}
-          onKeyDown={handleKeyDown}
-          placeholder={placeholder || 'Medication...'}
-          className="w-full px-2 py-2 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-lime focus:border-primary-lime"
-        />
-
-        {showSuggestions && filteredMeds.length > 0 && (
-          <div
-            ref={dropdownRef}
-            className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto"
-          >
-            {filteredMeds.map((medName, index) => (
-              <button
-                key={`${medName}-${index}`}
-                type="button"
-                onClick={() => handleSelect(medName)}
-                onMouseEnter={() => setSelectedIndex(index)}
-                className={`w-full text-left px-2 py-1.5 text-xs hover:bg-red-50 cursor-pointer ${
-                  index === selectedIndex ? 'bg-red-100' : ''
-                }`}
-              >
-                <div className="font-medium text-gray-900">{medName}</div>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  };
-
   return (
     <div className="min-h-screen bg-cardio-bg">
       <div className="container mx-auto px-4 py-8 max-w-7xl">
@@ -397,7 +276,7 @@ export function CVRiskCalculator() {
           </Link>
           <h1 className="text-3xl font-bold text-cardio-primary mb-2">CV Risk Optimization</h1>
           <p className="text-gray-600">Evidence-based medication recommendations for cardiovascular risk reduction</p>
-          <p className="text-sm text-gray-500">Based on 2023 AHA PREVENT Equations, 2025 AHA/ACC HTN Guideline, 2018 ACC/AHA Cholesterol Guidelines, 2022 Heart Failure Guidelines, 2023 AFib Guidelines, 2024 ADA Standards of Care</p>
+          <p className="text-sm text-gray-500">Based on 2023 AHA PREVENT Equations, 2025 AHA/ACC HTN Guideline, 2026 ACC/AHA Dyslipidemia Guideline, 2022 Heart Failure Guidelines, 2023 AFib Guidelines, 2026 ADA Standards of Care</p>
         </div>
 
         <main>
@@ -576,6 +455,7 @@ export function CVRiskCalculator() {
                         onChange={(e) => setPciTiming(e.target.value as PciTimingOption)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       >
+                        <option value="unknown">Unknown / confirm timing</option>
                         <option value="<3 months">&lt;3 months ago</option>
                         <option value="3-6 months">3-6 months ago</option>
                         <option value="6-12 months">6-12 months ago</option>
@@ -639,6 +519,15 @@ export function CVRiskCalculator() {
                     />
                     <span className="text-sm text-gray-700">Atrial Fibrillation</span>
                   </label>
+                  {atrialFibrillation && <label className="block text-sm font-medium text-gray-700 mt-3">
+                    Valve history for anticoagulant selection
+                    <select value={afValveStatus} onChange={e => setAfValveStatus(e.target.value as NonNullable<PatientData['history']['afValveStatus']>)} className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md">
+                      <option value="unknown">Unknown / not reviewed</option>
+                      <option value="none">Neither mechanical valve nor moderate/severe mitral stenosis</option>
+                      <option value="mechanical">Mechanical heart valve</option>
+                      <option value="mitral-stenosis">Moderate or severe mitral stenosis</option>
+                    </select>
+                  </label>}
                 </div>
                 )}
               </div>
@@ -1043,6 +932,7 @@ export function CVRiskCalculator() {
                 )}
               </div>
 
+              {validationErrors.length > 0 && <div role="alert" className="mb-4 rounded border border-red-300 bg-red-50 p-3 text-sm text-red-800"><p className="font-semibold">Review these entries</p><ul className="list-disc pl-5">{validationErrors.map(error => <li key={error}>{error}</li>)}</ul></div>}
               <button
                 onClick={onGenerateReport}
                 className="w-full bg-gradient-to-br from-blue-600 to-blue-700 text-white px-6 py-4 rounded-xl hover:from-blue-700 hover:to-blue-800 font-bold shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-[1.02] flex items-center justify-center gap-2"
@@ -1056,7 +946,7 @@ export function CVRiskCalculator() {
           {/* Right Panel - Report Preview */}
           <div className="col-span-3">
             <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-6 h-[calc(100vh-10rem)]">
-              {report ? (
+              {report && reportIsCurrent ? (
                 <div className="h-full flex flex-col">
                   <div className="flex gap-3 mb-4 no-print">
                     <button
@@ -1130,9 +1020,9 @@ export function CVRiskCalculator() {
                     <div className="w-32 h-32 mx-auto mb-6 bg-gradient-to-br from-blue-500/10 to-indigo-500/10 rounded-full flex items-center justify-center shadow-xl">
                       <FileText className="w-16 h-16 text-blue-600" />
                     </div>
-                    <p className="text-2xl font-bold text-slate-900 mb-2">No Report Generated</p>
+                    <p className="text-2xl font-bold text-slate-900 mb-2">{report && !reportIsCurrent ? 'Report needs updating' : 'No Report Generated'}</p>
                     <p className="text-sm text-slate-600 max-w-md mx-auto font-medium">
-                      Fill in patient information and click "Generate Clinical Report" to create evidence-based recommendations
+                      {report && !reportIsCurrent ? 'Patient information changed. Generate a new report before copying or printing.' : 'Fill in patient information and click Generate Clinical Report to create recommendations.'}
                     </p>
                   </div>
                 </div>
@@ -1145,3 +1035,109 @@ export function CVRiskCalculator() {
     </div>
   );
 }
+
+// Allergy medication autocomplete component
+const AllergyMedicationAutocomplete = ({ value, onSelect, placeholder }: { value: string; onSelect: (medName: string) => void; placeholder?: string }) => {
+  const [searchTerm, setSearchTerm] = useState(value);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState(-1);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Create a flat list of unique medication names (generic + brand)
+  const allMedNames = MEDICATIONS.flatMap(med => [
+    med.name,
+    med.genericName,
+    ...med.brandNames
+  ]);
+
+  const filteredMeds = searchTerm.length > 0
+    ? [...new Set(allMedNames)].filter((name) =>
+        name.toLowerCase().includes(searchTerm.toLowerCase())
+      ).slice(0, 10)
+    : [];
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node) &&
+        inputRef.current &&
+        !inputRef.current.contains(event.target as Node)
+      ) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleSelect = (medName: string) => {
+    onSelect(medName);
+    setSearchTerm(medName);
+    setShowSuggestions(false);
+    setSelectedIndex(-1);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (!showSuggestions) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSelectedIndex((prev) => (prev < filteredMeds.length - 1 ? prev + 1 : prev));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSelectedIndex((prev) => (prev > 0 ? prev - 1 : -1));
+    } else if (e.key === 'Enter' && selectedIndex >= 0) {
+      e.preventDefault();
+      handleSelect(filteredMeds[selectedIndex]);
+    } else if (e.key === 'Escape') {
+      setShowSuggestions(false);
+      setSelectedIndex(-1);
+    }
+  };
+
+  return (
+    <div className="relative">
+      <input
+        ref={inputRef}
+        type="text"
+        value={searchTerm}
+        onChange={(e) => {
+          setSearchTerm(e.target.value);
+          onSelect(e.target.value);
+          setShowSuggestions(true);
+          setSelectedIndex(-1);
+        }}
+        onFocus={() => {
+          if (searchTerm.length > 0) {
+            setShowSuggestions(true);
+          }
+        }}
+        onKeyDown={handleKeyDown}
+        placeholder={placeholder || 'Medication...'}
+        className="w-full px-2 py-2 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-lime focus:border-primary-lime"
+      />
+
+      {showSuggestions && filteredMeds.length > 0 && (
+        <div
+          ref={dropdownRef}
+          className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto"
+        >
+          {filteredMeds.map((medName, index) => (
+            <button
+              key={`${medName}-${index}`}
+              type="button"
+              onClick={() => handleSelect(medName)}
+              onMouseEnter={() => setSelectedIndex(index)}
+              className={`w-full text-left px-2 py-1.5 text-xs hover:bg-red-50 cursor-pointer ${
+                index === selectedIndex ? 'bg-red-100' : ''
+              }`}
+            >
+              <div className="font-medium text-gray-900">{medName}</div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};

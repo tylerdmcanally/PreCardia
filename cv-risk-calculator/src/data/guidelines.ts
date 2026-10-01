@@ -1,4 +1,8 @@
 export const GUIDELINES = {
+  DYSLIPIDEMIA_2026: '2026 ACC/AHA Dyslipidemia Guideline',
+  ADA_2026: '2026 ADA Standards of Care',
+  CCD_2023: '2023 AHA/ACC Chronic Coronary Disease Guideline',
+  DRUG_LABELS: 'US prescribing information (DailyMed)',
   BP_2025: '2025 AHA/ACC HTN Guideline',
   BP_2017: '2017 ACC/AHA HTN Guideline',
   CHOLESTEROL_2018: '2018 ACC/AHA Cholesterol Guideline',
@@ -17,6 +21,10 @@ export const GUIDELINES = {
 };
 
 export const GUIDELINE_REFERENCES = [
+  { short: GUIDELINES.DYSLIPIDEMIA_2026, full: '2026 ACC/AHA Multisociety Guideline on the Management of Dyslipidemia', citation: 'doi:10.1161/CIR.0000000000001423', url: 'https://professional.heart.org/en/science-news/2026-guideline-on-the-management-of-dyslipidemia' },
+  { short: GUIDELINES.ADA_2026, full: 'Standards of Care in Diabetes—2026', citation: 'Diabetes Care. 2026;49(Supplement 1)', url: 'https://diabetesjournals.org/care/issue/49/Supplement_1' },
+  { short: GUIDELINES.CCD_2023, full: '2023 AHA/ACC Multisociety Chronic Coronary Disease Guideline', citation: 'doi:10.1161/CIR.0000000000001168', url: 'https://professional.heart.org/en/science-news/2023-guideline-for-the-management-of-patients-with-chronic-coronary-disease' },
+  { short: GUIDELINES.DRUG_LABELS, full: 'US prescribing information: verify indication-specific dosing, contraindications and interactions', citation: 'DailyMed, reviewed October 1, 2026', url: 'https://dailymed.nlm.nih.gov/dailymed/' },
   {
     short: GUIDELINES.BP_2025,
     full:

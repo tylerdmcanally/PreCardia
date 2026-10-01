@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react';
 import { X } from 'lucide-react';
 import { CURRENT_RELEASE } from '../data/releaseNotes';
-import { PERIOPERATIVE_GUIDELINE } from '../logic/precardia/guideline';
 
 const SEEN_VERSION_KEY = 'cardiotools:last-seen-version';
 
@@ -67,8 +66,8 @@ export function ReleaseNotes() {
                   </li>
                 ))}
               </ul>
-              <a className="mt-5 inline-block text-sm font-semibold text-cardio-secondary underline underline-offset-4" href={PERIOPERATIVE_GUIDELINE.url} target="_blank" rel="noreferrer">
-                Read the 2026 guideline
+              <a className="mt-5 inline-block text-sm font-semibold text-cardio-secondary underline underline-offset-4" href={CURRENT_RELEASE.reference.url} target="_blank" rel="noreferrer">
+                {CURRENT_RELEASE.reference.label}
               </a>
             </div>
 

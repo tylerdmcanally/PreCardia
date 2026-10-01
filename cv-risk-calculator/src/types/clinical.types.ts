@@ -1,6 +1,6 @@
 export interface ClinicalCalculations {
   bmi: number;
-  egfr: number;
+  egfr: number | null;
   averageBP: { systolic: number; diastolic: number };
   bpClassification: BPClassification;
   bpTarget: { systolic: number; diastolic: number; rationale: string };
@@ -14,9 +14,10 @@ export interface ClinicalCalculations {
     ascvd_30yr: number | null;
     heartFailure_30yr: number | null;
   };
-  ascvdRisk: number; // Kept for backward compatibility - equals preventRisks.totalCVD_10yr || 0
-  ascvdCategory: 'low' | 'borderline' | 'intermediate' | 'high';
-  ckdStage: number;
+  ascvdRisk: number | null; // PREVENT-ASCVD, never total CVD or a missing-value zero.
+  ascvdCategory: 'low' | 'borderline' | 'intermediate' | 'high' | null;
+  preventUnavailableReason: string | null;
+  ckdStage: number | null;
   ldlGoal: number;
   a1cGoal: number;
   cha2ds2vasc?: {
@@ -28,6 +29,7 @@ export interface ClinicalCalculations {
 }
 
 export type BPClassification =
+  | 'Not assessed'
   | 'Normal'
   | 'Elevated'
   | 'Stage 1 Hypertension'

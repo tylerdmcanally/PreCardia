@@ -3,136 +3,46 @@ import { GUIDELINES } from '../../data/guidelines';
 import { getSafetyRecommendationsForDomain } from '../safety';
 import { hasMedicationInCategory } from '../safety/utils';
 
-export function generateDiabetesRecommendations(
-  patientData: PatientData,
-  calculations: ClinicalCalculations
-): DomainRecommendation[] {
-  const recommendations: DomainRecommendation[] = [
-    ...getSafetyRecommendationsForDomain('DIABETES_CARDIORENAL', patientData, calculations),
-  ];
+export function generateDiabetesRecommendations(patientData: PatientData, calculations: ClinicalCalculations): DomainRecommendation[] {
+  const recommendations = getSafetyRecommendationsForDomain('DIABETES_CARDIORENAL', patientData, calculations);
   const { history, labs, medications } = patientData;
-  const { egfr, ascvdRisk } = calculations;
-  const onDialysis = Boolean(history.dialysis);
+  const { egfr } = calculations;
+  if (!history.diabetes) return recommendations;
+  const evidence = GUIDELINES.ADA_2026;
+  const hasMetformin = hasMedicationInCategory(medications,'Diabetes - Metformin');
+  const hasSGLT2i = hasMedicationInCategory(medications,'Diabetes - SGLT2i');
+  const hasGLP1 = hasMedicationInCategory(medications,'Diabetes - GLP-1 RA');
+  const hasMRA = hasMedicationInCategory(medications,'MRA');
+  const hasRaas = hasMedicationInCategory(medications,'ACE Inhibitor') || hasMedicationInCategory(medications,'ARB');
+  const hasASCVD = history.cad || history.priorMI || history.priorPCI || history.stroke || history.tia || history.pad;
+  const highCVRisk = hasASCVD || history.heartFailure || history.ckd
+    || (calculations.preventRisks.totalCVD_10yr !== null && calculations.preventRisks.totalCVD_10yr >= 7.5);
 
-  if (!history.diabetes) {
-    return recommendations;
+  if (egfr === null) recommendations.push({priority:'HIGH',action:'EVALUATE',medication:'Kidney function before diabetes medication changes',evidence,
+    rationale:'Kidney function is unknown. Obtain current renal measurements before selecting or dosing renally dependent therapies.'});
+  if (history.dialysis) recommendations.push({priority:'HIGH',action:'EVALUATE',medication:'Diabetes regimen on dialysis',evidence,
+    rationale:'Metformin is contraindicated and SGLT2 inhibitors should not be initiated on dialysis. Individualize glucose-lowering therapy with nephrology/endocrinology.'});
+  if (!hasMetformin && egfr !== null && egfr >= 45 && !history.dialysis) recommendations.push({priority:'MODERATE',action:'CONSIDER',medication:'Metformin',
+    recommendedDose:'500mg daily with food; titrate to glycemic need and tolerability',evidence,
+    rationale:'Metformin may be used for glycemic management; treatment should reflect A1c, existing therapy and comorbidities. Cardioprotective therapy is not contingent on metformin use.',
+    monitoring:'Review contraindications, renal function and B12; reassess A1c in about 3 months.'});
+  if (!hasMetformin && egfr !== null && egfr >= 30 && egfr < 45 && !history.dialysis) recommendations.push({priority:'MODERATE',action:'DEFER',medication:'New metformin initiation',evidence:GUIDELINES.DRUG_LABELS,
+    rationale:'US labeling does not recommend initiating metformin at eGFR 30–44. For existing therapy, review benefit/risk and limit total daily dose to 1000mg per ADA/KDIGO guidance.'});
+  // HF module handles the HF SGLT2 indication, avoiding two simultaneous starts.
+  if (highCVRisk && !history.heartFailure && !hasSGLT2i && egfr !== null && egfr >= 20 && !history.dialysis) recommendations.push({priority:'HIGH',action:'CONSIDER',medication:'Empagliflozin',recommendedDose:'10mg daily if eligible',evidence,
+    rationale:'Type 2 diabetes with ASCVD, CKD or elevated cardiovascular risk supports an SGLT2 inhibitor with demonstrated benefit, independent of A1c.',
+    monitoring:'Confirm indication-specific renal eligibility, volume status, ketoacidosis risk and contraindications; discuss sick-day and perioperative holds.'});
+  if (history.ckd && (labs.uacr ?? 0) >= 30 && !hasMRA && !history.dialysis) {
+    const eligible = egfr !== null && egfr >= 25 && labs.potassium !== undefined && labs.potassium <= 5 && hasRaas;
+    recommendations.push({priority:'HIGH',action:history.heartFailure ? 'EVALUATE' : eligible ? 'CONSIDER' : 'DEFER',medication:'Finerenone',
+      recommendedDose:eligible && !history.heartFailure ? (egfr >= 60 ? '20mg daily if eligible' : '10mg daily if eligible') : undefined,
+      rationale:history.heartFailure ? 'Coordinate the HF and diabetic CKD MRA strategy. Do not start finerenone together with spironolactone or eplerenone; select one appropriate agent after confirming EF and indications.' : eligible ? 'T2D with albuminuric CKD: confirm persistent albuminuria despite maximally tolerated ACE-I/ARB before adding finerenone.'
+        : 'Do not initiate until eGFR ≥25, potassium ≤5.0, persistent albuminuria and background ACE-I/ARB treatment are confirmed. Missing potassium is not a normal result.',
+      evidence:`${GUIDELINES.CKD_2024}; ${GUIDELINES.DRUG_LABELS}`,
+      monitoring:'Review interactions. Check potassium/eGFR before initiation and at 4 weeks; additional early potassium monitoring when baseline K is >4.8–5.0.'});
   }
-
-  const a1c = labs.a1c || 0;
-  const hasMetformin = hasMedicationInCategory(medications, 'Diabetes - Metformin');
-  const hasSGLT2i = hasMedicationInCategory(medications, 'Diabetes - SGLT2i');
-  const hasGLP1 = hasMedicationInCategory(medications, 'Diabetes - GLP-1 RA');
-  const hasMRA = hasMedicationInCategory(medications, 'MRA');
-
-  const hasASCVD = history.cad || history.priorMI || history.stroke || history.pad;
-  const hasHF = history.heartFailure;
-  const hasCKD = history.ckd || onDialysis || egfr < 60;
-  const hasAlbuminuria = labs.uacr !== undefined && labs.uacr >= 30;
-
-  const highCVRisk = hasASCVD || hasHF || hasCKD || ascvdRisk >= 15;
-
-  if (onDialysis) {
-    recommendations.push({
-      priority: 'HIGH',
-      action: 'ADJUST',
-      medication: 'Diabetes regimen on dialysis',
-      recommendedDose: 'Avoid metformin and SGLT2i; favor insulin or GLP-1 RA for CV benefit',
-      rationale:
-        'Dialysis patients do not benefit from SGLT2 inhibitors and metformin is contraindicated; glucose management should rely on insulin and/or GLP-1 RA with nephrology input.',
-      evidence: `${GUIDELINES.ADA_2024}; ${GUIDELINES.CKD_2024}`,
-      additionalNotes: 'Finerenone not studied in dialysis; reassess if kidney function recovers off dialysis.',
-    });
-  }
-
-  // HIGH PRIORITY: Metformin if not on it
-  if (!hasMetformin && egfr >= 30 && !onDialysis) {
-    recommendations.push({
-      priority: 'HIGH',
-      action: 'ADD',
-      medication: 'Metformin',
-      recommendedDose: '500mg daily, titrate to 1000mg twice daily',
-      rationale: 'First-line agent for type 2 diabetes; improves insulin sensitivity, no hypoglycemia risk, weight neutral',
-      evidence: GUIDELINES.ADA_2024,
-      monitoring: 'A1c at 3 months; titrate dose as tolerated for GI side effects',
-      additionalNotes: egfr >= 30 && egfr < 45 ? 'eGFR 30-45: Use caution, max dose 1000mg BID' : undefined,
-    });
-  }
-
-  // HIGH PRIORITY: SGLT2i for diabetes + high CV risk
-  if (highCVRisk && !hasSGLT2i && egfr >= 20 && !onDialysis) {
-    const indication = hasASCVD
-      ? 'established CAD'
-      : hasHF
-      ? 'heart failure'
-      : hasCKD
-      ? 'CKD'
-      : 'high cardiovascular risk';
-
-    recommendations.push({
-      priority: 'HIGH',
-      action: 'ADD',
-      medication: 'Empagliflozin',
-      recommendedDose: '10mg daily',
-      rationale: `Type 2 diabetes with ${indication}; SGLT2 inhibitors provide proven cardiovascular mortality reduction (25%) and renal protection`,
-      evidence: GUIDELINES.ADA_2024,
-      additionalNotes: 'EMPA-REG OUTCOME trial demonstrated CV benefit',
-      monitoring:
-        'eGFR may transiently dip 3-5 mL/min (expected hemodynamic effect, beneficial long-term); genital mycotic infections (10-15% incidence)',
-    });
-  }
-
-  // HIGH PRIORITY: Finerenone for diabetic CKD with albuminuria
-  if (history.ckd && hasAlbuminuria && egfr >= 25 && !hasMRA && !onDialysis) {
-    recommendations.push({
-      priority: 'HIGH',
-      action: 'ADD',
-      medication: 'Finerenone',
-      recommendedDose: egfr >= 60 ? '20mg daily' : '10mg daily (titrate to 20mg as tolerated)',
-      rationale:
-        'Type 2 diabetes with CKD and albuminuria qualifies for finerenone (nonsteroidal MRA) to slow renal decline and reduce CV events (FIDELIO/FIGARO).',
-      evidence: GUIDELINES.KDIGO_2022,
-      monitoring: 'Check potassium and creatinine at baseline, 4 weeks, then quarterly; hold if K+ >5.5.',
-      additionalNotes: 'Ensure background ACE-I/ARB therapy is optimized before adding finerenone.',
-    });
-  }
-
-  // MODERATE PRIORITY: GLP-1 RA for additional benefit
-  if (highCVRisk && !hasGLP1 && (a1c > 7 || onDialysis)) {
-    recommendations.push({
-      priority: 'MODERATE',
-      action: 'CONSIDER',
-      medication: 'Semaglutide',
-      recommendedDose: '0.25mg weekly, titrate to 0.5-1mg weekly',
-      rationale:
-        onDialysis
-          ? 'Dialysis patients with diabetes/high CV risk can still derive ASCVD benefit from GLP-1 RA; SGLT2i and metformin are not options in ESKD.'
-          : 'Dual therapy with SGLT2i + GLP-1 RA shows additive CV benefit in high-risk patients; additional A1c reduction 1-1.5% and weight loss 10-15 lbs',
-      evidence: GUIDELINES.ADA_2024,
-      additionalNotes:
-        'SUSTAIN-6 trial demonstrated CV benefit; discuss cost, injection burden, and GI tolerability with patient',
-      monitoring: 'Start low dose to minimize nausea; titrate every 4 weeks',
-    });
-  }
-
-  const unableToUseSGLT2 = (egfr > 0 && egfr < 20) || onDialysis;
-  if (highCVRisk && !hasGLP1 && unableToUseSGLT2) {
-    recommendations.push({
-      priority: 'MODERATE',
-      action: 'ADD',
-      medication: 'Semaglutide',
-      recommendedDose: '0.25mg weekly, titrate to 1mg weekly as tolerated',
-      rationale:
-        'SGLT2 inhibitors are not feasible with current renal function; GLP-1 RA still provides ASCVD risk reduction per ACC/ADA guidance.',
-      evidence: GUIDELINES.ADA_2024,
-      monitoring: 'Review GI tolerance and weight trajectory; caution for medullary thyroid carcinoma history.',
-      additionalNotes: 'Consider oral semaglutide if injections are a barrier and renal function allows.',
-    });
-  }
-
-  return sortByPriority(recommendations);
-}
-
-function sortByPriority(recommendations: DomainRecommendation[]): DomainRecommendation[] {
-  const priorityOrder = { HIGH: 1, MODERATE: 2, LOW: 3 };
-  return recommendations.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
+  if (highCVRisk && !hasGLP1) recommendations.push({priority:'MODERATE',action:'CONSIDER',medication:'GLP-1 receptor agonist with demonstrated cardiovascular benefit',
+    rationale:'For T2D with ASCVD/high risk or CKD, consider a GLP-1 RA for cardiovascular/kidney benefit independent of current A1c or metformin use.',evidence,
+    monitoring:'Select an agent with evidence for the intended outcome; review contraindications, GI tolerance, other glucose-lowering therapy, cost and preferences. Dialysis requires individualized specialist review.'});
+  return recommendations;
 }

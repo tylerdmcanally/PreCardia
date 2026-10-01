@@ -1,6 +1,7 @@
 import { BPClassification } from '../../types';
 
 export function classifyBloodPressure(systolic: number, diastolic: number): BPClassification {
+  if (!Number.isFinite(systolic) || !Number.isFinite(diastolic) || systolic <= 0 || diastolic <= 0) return 'Not assessed';
   if (systolic >= 180 || diastolic >= 120) {
     return 'Hypertensive Crisis';
   }
@@ -42,10 +43,10 @@ export function determineBPTarget(params: {
   hasASCVD: boolean;
   hasDiabetes: boolean;
   hasCKD: boolean;
-  ascvdRisk?: number;
+  totalCVDRisk?: number | null;
 }): { systolic: number; diastolic: number; rationale: string } {
-  const { hasASCVD, hasDiabetes, hasCKD, ascvdRisk } = params;
-  const isHighRiskByPREVENT = typeof ascvdRisk === 'number' && ascvdRisk >= 7.5;
+  const { hasASCVD, hasDiabetes, hasCKD, totalCVDRisk } = params;
+  const isHighRiskByPREVENT = typeof totalCVDRisk === 'number' && totalCVDRisk >= 7.5;
   const highRiskOrClinical = hasASCVD || hasDiabetes || hasCKD || isHighRiskByPREVENT;
 
   return {

@@ -4,6 +4,8 @@ import { generateLipidRecommendations } from './lipids';
 import { generateDiabetesRecommendations } from './diabetes';
 import { generateHeartFailureRecommendations } from './heartFailure';
 import { generateAnticoagulationRecommendations } from './anticoagulation';
+import { getSafetyRecommendationsForDomain } from '../safety';
+import { guardProposedTherapy } from '../safety/utils';
 import { generateLifestyleRecommendations } from './lifestyle';
 
 const DOMAIN_DISPLAY_NAMES: Record<DomainName, string> = {
@@ -27,10 +29,19 @@ export function generateAllDomainRecommendations(
     domains.push({
       name: 'BLOOD_PRESSURE',
       displayName: DOMAIN_DISPLAY_NAMES.BLOOD_PRESSURE,
-      currentStatus: `Current: ${calculations.averageBP.systolic}/${calculations.averageBP.diastolic} | Target: <${calculations.bpTarget.systolic}/${calculations.bpTarget.diastolic}`,
+      currentStatus: calculations.bpClassification === 'Not assessed' ? 'BP not assessed' : `Current: ${calculations.averageBP.systolic}/${calculations.averageBP.diastolic} | Target: <${calculations.bpTarget.systolic}/${calculations.bpTarget.diastolic}`,
       recommendations: bpRecs,
       order: 1,
     });
+  }
+
+  if (calculations.bpClassification === 'Hypertensive Crisis' || (patientData.labs.potassium ?? 0) >= 6) {
+    // Keep actionable safety findings for current drugs while deferring routine starts.
+    for (const domain of ['HEART_FAILURE', 'DIABETES_CARDIORENAL', 'ANTIPLATELET_ANTICOAGULATION'] as const) {
+      bpRecs.push(...getSafetyRecommendationsForDomain(domain, patientData, calculations)
+        .filter(rec => rec.priority === 'HIGH' && ['HOLD', 'DISCONTINUE', 'ADJUST'].includes(rec.action)));
+    }
+    return domains;
   }
 
   // Lipid Domain
@@ -52,7 +63,7 @@ export function generateAllDomainRecommendations(
       name: 'DIABETES_CARDIORENAL',
       displayName: DOMAIN_DISPLAY_NAMES.DIABETES_CARDIORENAL,
       currentStatus: `A1c: ${patientData.labs.a1c || 'N/A'}% (goal <${calculations.a1cGoal}%) | eGFR: ${
-        calculations.egfr
+        calculations.egfr ?? 'Unknown'
       } mL/min/1.73m2`,
       recommendations: diabetesRecs,
       order: 3,
@@ -83,7 +94,7 @@ export function generateAllDomainRecommendations(
     if (calculations.cha2ds2vasc && (patientData.history.cad || patientData.history.priorMI)) {
       // Patient has BOTH AF and CAD/MI
       const { score, riskCategory, annualStrokeRisk } = calculations.cha2ds2vasc;
-      currentStatus = `AF: CHA2DS2-VASc ${score} (${riskCategory} risk, ${annualStrokeRisk} annual stroke risk) | CAD/MI: Antiplatelet therapy required`;
+      currentStatus = `AF: CHA2DS2-VASc ${score} (${riskCategory} risk, ${annualStrokeRisk} annual stroke risk) | CAD/MI: Review combined antithrombotic plan`;
     } else if (calculations.cha2ds2vasc) {
       // Patient has AF only
       const { score, riskCategory, annualStrokeRisk } = calculations.cha2ds2vasc;
@@ -91,8 +102,8 @@ export function generateAllDomainRecommendations(
     } else if (patientData.history.cad || patientData.history.priorMI) {
       // Patient has CAD/MI only (no AF)
       currentStatus = patientData.history.priorMI
-        ? 'Post-MI: DAPT required for 12 months, then aspirin alone'
-        : 'Stable CAD: Aspirin for secondary prevention';
+        ? 'Prior MI: confirm event timing and antiplatelet plan'
+        : 'Stable CAD: review secondary-prevention antiplatelet therapy';
     }
 
     domains.push({
@@ -116,7 +127,7 @@ export function generateAllDomainRecommendations(
     });
   }
 
-  return domains.sort((a, b) => a.order - b.order);
+  return domains.map(domain => ({ ...domain, recommendations: domain.recommendations.map(rec => guardProposedTherapy(rec, patientData.allergies)) })).sort((a, b) => a.order - b.order);
 }
 
 export * from './bloodPressure';

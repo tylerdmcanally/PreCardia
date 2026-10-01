@@ -1,4 +1,4 @@
-import { PatientData, ClinicalCalculations, ClinicalReport, MedicationReview, Medication, ClinicalDomain, DomainRecommendation, MedicationCategory } from '../../types';
+import { PatientData, ClinicalCalculations, ClinicalReport, MedicationReview, Medication, ClinicalDomain, DomainRecommendation, MedicationCategory, DomainName } from '../../types';
 import { generateAllDomainRecommendations } from '../recommendations';
 import { buildMonitoringPlan } from './monitoringPlan';
 import { GUIDELINE_REFERENCES, KEY_TRIALS } from '../../data/guidelines';
@@ -6,10 +6,13 @@ import { hasMedicationInCategory } from '../safety/utils';
 
 export function generateClinicalReport(
   patientData: PatientData,
-  calculations: ClinicalCalculations
+  calculations: ClinicalCalculations,
+  selectedDomains?: ReadonlySet<DomainName>
 ): ClinicalReport {
   // Generate all domain recommendations first
-  const domains = generateAllDomainRecommendations(patientData, calculations);
+  const urgent = calculations.bpClassification === 'Hypertensive Crisis' || (patientData.labs.potassium ?? 0) >= 6;
+  const domains = generateAllDomainRecommendations(patientData, calculations)
+    .filter(domain => urgent || !selectedDomains || selectedDomains.has(domain.name));
 
   // Review current medications (needs domains to check for discontinuation recommendations)
   const medicationReview = reviewCurrentMedications(patientData, calculations, domains);
@@ -61,28 +64,24 @@ function buildRiskProfile(patientData: PatientData, calculations: ClinicalCalcul
   const { history, labs } = patientData;
   const { averageBP, bpClassification, preventRisks, ascvdCategory, egfr, ckdStage } = calculations;
 
-  let profile = `BP: ${averageBP.systolic}/${averageBP.diastolic} mmHg (${bpClassification}) | Target: <${calculations.bpTarget.systolic}/${calculations.bpTarget.diastolic}\n`;
+  let profile = bpClassification === 'Not assessed' ? 'BP: Not assessed\n' : `BP: ${averageBP.systolic}/${averageBP.diastolic} mmHg (${bpClassification}) | Target: <${calculations.bpTarget.systolic}/${calculations.bpTarget.diastolic}\n`;
 
-  if (preventRisks.totalCVD_10yr && preventRisks.totalCVD_10yr > 0) {
-    profile += `\n10-YEAR PREVENT CARDIOVASCULAR RISKS:\n`;
-    profile += `  Total CVD Risk: ${preventRisks.totalCVD_10yr.toFixed(1)}% (${capitalize(ascvdCategory)})\n`;
-    profile += `  ASCVD Risk: ${preventRisks.ascvd_10yr?.toFixed(1)}%\n`;
-    profile += `  Heart Failure Risk: ${preventRisks.heartFailure_10yr?.toFixed(1)}%\n`;
-
-    // Show 30-year risks if available (ages 30-59 only)
-    if (preventRisks.totalCVD_30yr !== null) {
-      profile += `\n30-YEAR PREVENT CARDIOVASCULAR RISKS:\n`;
-      profile += `  Total CVD Risk: ${preventRisks.totalCVD_30yr.toFixed(1)}%\n`;
-      profile += `  ASCVD Risk: ${preventRisks.ascvd_30yr?.toFixed(1)}%\n`;
-      profile += `  Heart Failure Risk: ${preventRisks.heartFailure_30yr?.toFixed(1)}%\n`;
-    }
+  const riskText = (risk: number | null) => risk === null ? 'Unavailable' : `${risk.toFixed(1)}%`;
+  profile += `\n10-YEAR PREVENT RISKS (base equations):\n  Total CVD: ${riskText(preventRisks.totalCVD_10yr)}\n  ASCVD: ${riskText(preventRisks.ascvd_10yr)}${ascvdCategory ? ` (${capitalize(ascvdCategory)}; 2026 lipid categories)` : ''}\n  Heart failure: ${riskText(preventRisks.heartFailure_10yr)}\n`;
+  if (calculations.preventUnavailableReason) profile += `PREVENT: ${calculations.preventUnavailableReason}\n`;
+  if (preventRisks.totalCVD_30yr !== null || preventRisks.heartFailure_30yr !== null) {
+    profile += `30-YEAR PREVENT RISKS: Total CVD ${riskText(preventRisks.totalCVD_30yr)}; ASCVD ${riskText(preventRisks.ascvd_30yr)}; HF ${riskText(preventRisks.heartFailure_30yr)}\n`;
   }
+  profile += 'Displayed risks are rounded; treatment thresholds use the unrounded estimates.\n';
 
   if (history.dialysis) {
     profile += 'Kidney Function: End-stage kidney disease on dialysis (treat as CKD Stage 5D)\n';
-  } else if (egfr > 0) {
-    profile += `Kidney Function: eGFR ${egfr} mL/min/1.73m2 (CKD Stage ${ckdStage})\n`;
+  } else if (egfr !== null) {
+    profile += `Kidney Function: eGFR ${egfr} mL/min/1.73m2${history.ckd && ckdStage !== null ? ` (reported CKD, GFR stage ${ckdStage})` : ''}\n`;
+    if (!history.ckd && egfr < 60) profile += 'Reduced eGFR: assess acuity and chronicity; a single result does not establish CKD.\n';
   }
+
+  if (egfr === null && !history.dialysis) profile += 'Kidney function: Unknown; no renal-dependent dosing inferred.\n';
 
   if (history.diabetes && labs.a1c) {
     profile += `Diabetes Control: A1c ${labs.a1c}% (goal <${calculations.a1cGoal}%)\n`;
@@ -98,8 +97,8 @@ function buildRiskProfile(patientData: PatientData, calculations: ClinicalCalcul
   if (history.diabetes) diagnoses.push('Type 2 Diabetes');
   if (history.dialysis) {
     diagnoses.push('CKD Stage 5D (on dialysis)');
-  } else if (history.ckd || ckdStage >= 3) {
-    diagnoses.push(`CKD Stage ${ckdStage}`);
+  } else if (history.ckd) {
+    diagnoses.push(ckdStage === null ? 'Reported CKD (stage unknown)' : `Reported CKD Stage ${ckdStage}`);
   }
   if (history.cad) diagnoses.push('CAD');
   if (history.priorMI) diagnoses.push('Prior MI');
@@ -227,207 +226,19 @@ function checkIfNeedsOptimization(
   return false;
 }
 
-function buildFollowUpPlan(calculations: ClinicalCalculations, domains: ClinicalDomain[], patientData?: PatientData): string {
-  const allRecs = domains.flatMap((d) => d.recommendations);
-  const onDialysis = Boolean(calculations.ckdStage === 5 && domains.some((d) => d.name)) || Boolean(patientData?.history.dialysis);
-
-  // Determine next appointment timing based on urgency
-  const timing = determineNextAppointmentTiming(allRecs, calculations);
-
-  // Build specific focus areas based on recommendations
-  const focusAreas = buildNextVisitFocus(allRecs);
-
-  let plan = `Next Appointment: ${timing}\n`;
-  plan += `Focus: ${focusAreas.join(', ')}\n\n`;
-
-  // 3-month follow-up
-  const threeMonthFocus = buildThreeMonthFocus(allRecs);
-  if (threeMonthFocus.length > 0) {
-    plan += '3-Month Follow-Up:\n';
-    plan += `Focus: ${threeMonthFocus.join(', ')}\n\n`;
-  }
-
-  // Target goals for next visit
-  plan += 'Target Goals for Next Visit:\n';
-  if (onDialysis) {
-    plan += '• BP individualized on dialysis: prioritize dry-weight optimization; avoid pre-dialysis hypotension (<120 systolic)\n';
-    plan += '• Review intradialytic BP trends and home/off-dialysis readings\n';
-  } else {
-    plan += `• BP <${calculations.bpTarget.systolic}/${calculations.bpTarget.diastolic} mmHg (home readings)\n`;
-  }
-  plan += '• Medication adherence and tolerability\n';
-
-  const hasSmokingRec = allRecs.some(
-    (r) => r.medication.toLowerCase().includes('smoking') || r.rationale.toLowerCase().includes('smoking')
-  );
-  if (hasSmokingRec) {
-    plan += '• Smoking cessation progress\n';
-  }
-
-  const hasBPRecs = domains.some((d) => d.name === 'BLOOD_PRESSURE' && d.recommendations.length > 0);
-  if (hasBPRecs) {
-    plan += '• Home BP log review\n';
-  }
-
-  plan += '\nLong-Term Goals:\n';
-  plan += `• BP <${calculations.bpTarget.systolic}/${calculations.bpTarget.diastolic} mmHg sustained\n`;
-  plan += `• LDL <${calculations.ldlGoal} mg/dL\n`;
-
-  if (calculations.a1cGoal) {
-    plan += `• A1c <${calculations.a1cGoal}%\n`;
-  }
-
-  if (hasSmokingRec) {
-    plan += '• Complete smoking cessation\n';
-  }
-
+function buildFollowUpPlan(calculations: ClinicalCalculations, domains: ClinicalDomain[], patientData: PatientData): string {
+  if (calculations.bpClassification === 'Hypertensive Crisis' || (patientData.labs.potassium ?? 0) >= 6) return 'Immediate clinical assessment; determine disposition and reassessment timing from symptoms, repeat measurements, ECG and evidence of acute organ injury. Routine optimization follow-up is deferred.';
+  if (!domains.length) return 'No domains selected. Select the clinical areas to include in the plan.';
+  const recs = domains.flatMap(domain => domain.recommendations);
+  const changes = recs.filter(rec => ['ADD', 'INCREASE', 'SWITCH', 'CONSIDER'].includes(rec.action));
+  let plan = 'Resolve missing information and safety findings before implementing treatment options. Agree on staged changes with the patient; options are not simultaneous medication orders.\n';
+  if (changes.length) plan += 'If treatment changes are made, arrange the medication-specific monitoring listed above; do not wait for a routine visit when earlier labs or review are required.\n';
+  if (domains.some(d => d.name === 'BLOOD_PRESSURE')) plan += patientData.history.dialysis
+    ? 'BP follow-up: individualize with the dialysis team, including dry weight and home/intradialytic readings.\n'
+    : `BP follow-up: confirm home readings and reassess in about 1 month after treatment initiation or adjustment; goal <${calculations.bpTarget.systolic}/${calculations.bpTarget.diastolic} if tolerated. Low-risk untreated stage 1 hypertension: reassess after 3–6 months of lifestyle therapy.\n`;
+  if (domains.some(d => d.name === 'LIPID_MANAGEMENT')) plan += `Lipid follow-up: repeat lipids 4–12 weeks after an agreed treatment change; LDL-C goal <${calculations.ldlGoal} mg/dL, individualized to the clinical context.\n`;
+  if (patientData.history.diabetes && domains.some(d => d.name === 'DIABETES_CARDIORENAL')) plan += `Diabetes follow-up: reassess A1c in about 3 months after a treatment change; usual goal <${calculations.a1cGoal}%, individualized to comorbidity and hypoglycemia risk.\n`;
   return plan;
-}
-
-function determineNextAppointmentTiming(allRecs: DomainRecommendation[], calculations: ClinicalCalculations): string {
-  const highPriorityAdds = allRecs.filter(
-    (r) => r.priority === 'HIGH' && (r.action === 'ADD' || r.action === 'INCREASE')
-  );
-
-  // Check for medications requiring close monitoring
-  const hasACEARB = allRecs.some(
-    (r) =>
-      (r.action === 'ADD' || r.action === 'INCREASE') &&
-      (r.medication.toLowerCase().includes('lisinopril') ||
-        r.medication.toLowerCase().includes('losartan') ||
-        r.medication.toLowerCase().includes('enalapril') ||
-        r.medication.toLowerCase().includes('valsartan'))
-  );
-
-  const hasMultipleBPMeds = allRecs.filter(
-    (r) =>
-      (r.action === 'ADD' || r.action === 'INCREASE') &&
-      (r.medication.toLowerCase().includes('amlodipine') ||
-        r.medication.toLowerCase().includes('chlorthalidone') ||
-        r.medication.toLowerCase().includes('hydrochlorothiazide') ||
-        r.medication.toLowerCase().includes('lisinopril') ||
-        r.medication.toLowerCase().includes('losartan'))
-  ).length >= 2;
-
-  const isStage2HTN = calculations.bpClassification === 'Stage 2 Hypertension';
-
-  // 1-2 weeks: Stage 2 HTN with multiple new BP meds, or ACE-I/ARB needing safety check
-  if ((isStage2HTN && hasMultipleBPMeds) || (hasACEARB && highPriorityAdds.length >= 2)) {
-    return '1-2 weeks';
-  }
-
-  // 2 weeks: ACE-I/ARB initiation (safety labs)
-  if (hasACEARB) {
-    return '2 weeks';
-  }
-
-  // 2-4 weeks: Multiple high priority changes
-  if (highPriorityAdds.length >= 3) {
-    return '2-4 weeks';
-  }
-
-  // 4 weeks: Moderate changes or fewer high priority items
-  if (highPriorityAdds.length >= 1 || allRecs.some((r) => r.action === 'ADD')) {
-    return '4 weeks';
-  }
-
-  // 6-8 weeks: Minor changes only
-  return '6-8 weeks';
-}
-
-function buildNextVisitFocus(allRecs: DomainRecommendation[]): string[] {
-  const focus: string[] = [];
-
-  // Lab review if safety labs needed
-  const hasACEARB = allRecs.some(
-    (r) =>
-      (r.action === 'ADD' || r.action === 'INCREASE') &&
-      (r.medication.toLowerCase().includes('lisinopril') || r.medication.toLowerCase().includes('losartan'))
-  );
-
-  if (hasACEARB) {
-    focus.push('review BMP results (K+, Cr after ACE-I/ARB initiation)');
-  }
-
-  // Specific new medications with side effects
-  const newMeds: string[] = [];
-  const sideEffects: string[] = [];
-
-  allRecs
-    .filter((r) => r.action === 'ADD' || r.action === 'INCREASE')
-    .forEach((r) => {
-      const medLower = r.medication.toLowerCase();
-      if (medLower.includes('lisinopril') || medLower.includes('losartan')) {
-        if (!newMeds.includes('ACE-I/ARB')) {
-          newMeds.push('ACE-I/ARB');
-          sideEffects.push('dry cough, dizziness, hyperkalemia');
-        }
-      } else if (medLower.includes('amlodipine')) {
-        newMeds.push('amlodipine');
-        sideEffects.push('peripheral edema');
-      } else if (medLower.includes('chlorthalidone') || medLower.includes('hydrochlorothiazide')) {
-        newMeds.push('thiazide diuretic');
-        sideEffects.push('hypokalemia, nocturia');
-      } else if (medLower.includes('statin')) {
-        newMeds.push('statin');
-        sideEffects.push('muscle pain, elevated liver enzymes');
-      } else if (medLower.includes('metformin')) {
-        newMeds.push('metformin');
-        sideEffects.push('GI upset, nausea');
-      } else if (medLower.includes('empagliflozin') || medLower.includes('dapagliflozin')) {
-        newMeds.push('SGLT2 inhibitor');
-        sideEffects.push('genital mycotic infections, polyuria');
-      }
-    });
-
-  if (sideEffects.length > 0) {
-    focus.push(`assess for medication side effects (${sideEffects.join('; ')})`);
-  }
-
-  // BP control
-  const hasBPRecs = allRecs.some((r) => r.medication.toLowerCase().includes('amlodipine') || r.medication.toLowerCase().includes('lisinopril'));
-  if (hasBPRecs) {
-    focus.push('check home BP log');
-  }
-
-  // General adherence
-  focus.push('assess medication tolerability');
-
-  return focus;
-}
-
-function buildThreeMonthFocus(allRecs: DomainRecommendation[]): string[] {
-  const focus: string[] = [];
-
-  // Statin follow-up
-  const hasStatin = allRecs.some((r) => r.medication.toLowerCase().includes('statin'));
-  if (hasStatin) {
-    focus.push('review lipid panel and A1c');
-  }
-
-  // Diabetes management
-  const hasDiabetesMeds = allRecs.some(
-    (r) => r.medication.toLowerCase().includes('metformin') || r.medication.toLowerCase().includes('empagliflozin')
-  );
-  if (hasDiabetesMeds && !hasStatin) {
-    focus.push('review A1c');
-  }
-
-  // BP reassessment
-  const hasBPMeds = allRecs.some((r) => r.medication.toLowerCase().includes('amlodipine') || r.medication.toLowerCase().includes('lisinopril'));
-  if (hasBPMeds) {
-    focus.push('reassess BP control');
-  }
-
-  // Smoking status
-  const hasSmokingRec = allRecs.some(
-    (r) => r.medication.toLowerCase().includes('smoking') || r.rationale.toLowerCase().includes('smoking')
-  );
-  if (hasSmokingRec) {
-    focus.push('smoking status');
-  }
-
-  return focus;
 }
 
 function compileReferences(domains: ClinicalDomain[]): string {
@@ -451,7 +262,7 @@ function compileReferences(domains: ClinicalDomain[]): string {
 
   // Match guidelines used with their full references including URLs
   GUIDELINE_REFERENCES.forEach((guidelineRef) => {
-    if (Array.from(guidelinesUsed).some((g) => g === guidelineRef.short)) {
+    if (Array.from(guidelinesUsed).some((g) => g.includes(guidelineRef.short))) {
       guidelineCount++;
       refs += `${guidelineCount}. ${guidelineRef.full}\n`;
       refs += `   ${guidelineRef.citation}\n`;

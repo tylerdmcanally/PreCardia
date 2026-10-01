@@ -4,28 +4,16 @@ import { version } from '../../package.json';
 export const CURRENT_RELEASE = {
   version,
   date: 'October 1, 2026',
-  title: 'A clearer PreCardia assessment',
-  summary: 'Work through the assessment in six steps, with related questions together and a review before generating your report. This release also includes the guideline corrections introduced in v1.1.0; the 2026 publication reaffirms the 2024 recommendations.',
+  title: 'CV Optimization clinical corrections',
+  summary: 'The existing assessment workflow is retained. This release corrects risk interpretation, medication safety checks and report validation in CV Optimization.',
+  reference: {
+    label: 'Read the 2026 dyslipidemia guideline summary',
+    url: 'https://professional.heart.org/en/science-news/2026-guideline-on-the-management-of-dyslipidemia/top-things-to-know',
+  },
   changes: [
-    {
-      title: 'Guided steps and easier editing',
-      description: 'Start with the patient and planned surgery, then review conditions, interventions, function, medications and labs. Move freely between steps, follow field-specific validation links, and edit entries from the review screen. Reports must be regenerated after answers change.',
-    },
-    {
-      title: 'Functional capacity and testing',
-      description: 'DASI scores of 34 or less indicate poor capacity, even when estimated METs exceed 4. Stress testing and CCTA now follow one consistent pathway based on risk, capacity, clinical stability and surgical urgency.',
-    },
-    {
-      title: 'Timing after coronary intervention',
-      description: 'Stent guidance now accounts for ACS versus chronic coronary disease, calendar-month intervals and planned antiplatelet interruption. Balloon angioplasty and recent stroke/TIA have dedicated timing guidance.',
-    },
-    {
-      title: 'Medication and biomarker guidance',
-      description: 'Updated beta-blocker, ACE inhibitor/ARB, SGLT2 inhibitor and anticoagulant guidance. Preoperative biomarkers and postoperative troponin surveillance now use the guideline’s eligibility criteria.',
-    },
-    {
-      title: 'Clearer risk reports',
-      description: 'RCRI reports no longer assign a fixed individualized MACE percentage. Reports distinguish unknown information, use the correct 2021 eGFR equation and remove unsupported blanket waiting periods after TAVR, TEER, MI and CABG.',
-    },
+    { title: 'Risk and lipid treatment', description: 'Lipid decisions use PREVENT-ASCVD and the 2026 risk thresholds. Total CVD risk remains separate for BP decisions. Statin recommendations are consolidated, with appropriate high-intensity choices.' },
+    { title: 'Missing information stays unknown', description: 'Blank or invalid entries no longer become normal BP, zero risk or kidney disease. PREVENT is withheld outside its supported population, including established cardiovascular disease and dialysis.' },
+    { title: 'Medication safety', description: 'Updated potassium and kidney-function checks for MRAs, metformin and SGLT2 inhibitors. AF recommendations require valve history and use indication-specific renal/dosing review. CAD antiplatelet guidance is available without AF.' },
+    { title: 'Reports that match the assessment', description: 'Urgent BP or potassium findings take precedence over routine optimization. Editing patient inputs requires a new report, and domain filters now keep monitoring and follow-up consistent.' },
   ],
 };

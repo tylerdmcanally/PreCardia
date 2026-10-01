@@ -54,6 +54,7 @@ function calculateRisk(
   timeframe: '10yr' | '30yr'
 ): number | null {
   const { age, sex, totalCholesterol, hdl, systolicBP, onBPMeds, diabetic, smoker, bmi, egfr, onStatin } = inputs;
+  if (![age, systolicBP, egfr].every(Number.isFinite) || !['male', 'female'].includes(sex)) return null;
 
   // Age validation based on timeframe
   if (timeframe === '10yr') {
@@ -65,17 +66,17 @@ function calculateRisk(
   // Validate inputs according to official AHA ranges
   if (outcome !== 'HF') {
     // CVD and ASCVD require cholesterol
-    if (!totalCholesterol || totalCholesterol < 130 || totalCholesterol > 320) return null;
-    if (!hdl || hdl < 20 || hdl > 100) return null;
+    if (!Number.isFinite(totalCholesterol) || totalCholesterol < 130 || totalCholesterol > 320) return null;
+    if (!Number.isFinite(hdl) || hdl < 20 || hdl > 100) return null;
   }
 
   if (outcome === 'HF') {
     // HF requires BMI
-    if (!bmi || bmi < 18.5 || bmi >= 40) return null;
+    if (!Number.isFinite(bmi) || bmi < 18.5 || bmi > 39.9) return null;
   }
 
   if (!systolicBP || systolicBP < 90 || systolicBP > 200) return null;
-  if (egfr === undefined || egfr === null || egfr <= 0) return null;
+  if (egfr < 15 || egfr > 140) return null;
 
   // Convert cholesterol to mmol/L
   const tcMmol = mmolConversion(totalCholesterol);
@@ -375,7 +376,7 @@ function calculateRisk(
   // Convert log odds to probability (as percentage)
   const risk = 100 * Math.exp(logOdds) / (1 + Math.exp(logOdds));
 
-  return Math.round(risk * 10) / 10; // Round to 1 decimal place
+  return risk; // Preserve precision for treatment thresholds; round only for display.
 }
 
 /**
@@ -396,16 +397,16 @@ export function calculateAllPREVENTRisks(inputs: PREVENTInputs): PREVENTRisks {
 /**
  * Calculate PREVENT 10-year Total CVD risk (backward compatibility)
  */
-export function calculatePREVENTRisk(inputs: PREVENTInputs): number {
-  return calculateRisk(inputs, 'CVD', '10yr') || 0;
+export function calculatePREVENTRisk(inputs: PREVENTInputs): number | null {
+  return calculateRisk(inputs, 'CVD', '10yr');
 }
 
 /**
  * Categorize PREVENT risk according to AHA guidelines
  */
 export function categorizePREVENTRisk(risk: number): 'low' | 'borderline' | 'intermediate' | 'high' {
-  if (risk < 5) return 'low';
-  if (risk < 7.5) return 'borderline';
-  if (risk < 20) return 'intermediate';
+  if (risk < 3) return 'low';
+  if (risk < 5) return 'borderline';
+  if (risk < 10) return 'intermediate';
   return 'high';
 }

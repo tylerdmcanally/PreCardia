@@ -55,52 +55,16 @@ export function interpretCHA2DS2VASc(
   annualStrokeRisk: string;
   recommendation: string;
 } {
-  // For males: 0 = low, 1 = moderate, ≥2 = high
-  // For females: 1 = low (0 points after removing sex point), 2 = moderate, ≥3 = high
-  // But we calculate with sex included, so:
-  // Males: 0 = low, 1 = moderate, ≥2 = high
-  // Females: ≤1 = low, 2 = moderate, ≥3 = high
-
-  if (sex === 'male') {
-    if (score === 0) {
-      return {
-        riskCategory: 'Low',
-        annualStrokeRisk: '0-0.2%',
-        recommendation: 'No anticoagulation recommended. May consider aspirin.',
-      };
-    } else if (score === 1) {
-      return {
-        riskCategory: 'Moderate',
-        annualStrokeRisk: '0.6-2.2%',
-        recommendation: 'Consider oral anticoagulation based on patient preference and bleeding risk.',
-      };
-    } else {
-      return {
-        riskCategory: 'High',
-        annualStrokeRisk: score === 2 ? '2.2%' : `${score * 1.5}%`,
-        recommendation: 'Oral anticoagulation recommended (DOAC preferred over warfarin).',
-      };
-    }
-  } else {
-    // Female
-    if (score <= 1) {
-      return {
-        riskCategory: 'Low',
-        annualStrokeRisk: '0-0.6%',
-        recommendation: 'No anticoagulation recommended. May consider aspirin.',
-      };
-    } else if (score === 2) {
-      return {
-        riskCategory: 'Moderate',
-        annualStrokeRisk: '2.2%',
-        recommendation: 'Consider oral anticoagulation based on patient preference and bleeding risk.',
-      };
-    } else {
-      return {
-        riskCategory: 'High',
-        annualStrokeRisk: `${score * 1.5}%`,
-        recommendation: 'Oral anticoagulation recommended (DOAC preferred over warfarin).',
-      };
-    }
-  }
+  const riskCategory = score >= (sex === 'female' ? 3 : 2) ? 'High'
+    : score === (sex === 'female' ? 2 : 1) ? 'Moderate' : 'Low';
+  return {
+    riskCategory,
+    // The guideline uses risk strata; do not invent an individualized percentage
+    // by multiplying the score. Rates vary substantially across cohorts.
+    annualStrokeRisk: riskCategory === 'High' ? '≥2% risk stratum' : riskCategory === 'Moderate' ? '1% to <2% risk stratum' : '<1% risk stratum',
+    recommendation: riskCategory === 'Low'
+      ? 'Anticoagulation is not routinely indicated by this score alone; aspirin provides no benefit for AF stroke prevention.'
+      : riskCategory === 'Moderate' ? 'Oral anticoagulation is reasonable after shared decision-making.'
+      : 'Oral anticoagulation is recommended; confirm valve status, bleeding considerations and agent-specific dosing.',
+  };
 }

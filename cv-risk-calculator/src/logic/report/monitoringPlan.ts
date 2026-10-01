@@ -1,109 +1,41 @@
 import { ClinicalDomain, MonitoringPlan, PatientData, ClinicalCalculations } from '../../types';
 
-export function buildMonitoringPlan(
-  domains: ClinicalDomain[],
-  patientData: PatientData,
-  calculations: ClinicalCalculations
-): MonitoringPlan {
-  const onDialysis = Boolean(patientData.history.dialysis);
-  const plan: MonitoringPlan = {
-    shortTerm: [],
-    mediumTerm: [],
-    longTerm: [],
-  };
-
-  const allRecs = domains.flatMap((d) => d.recommendations);
-
-  // Short-term monitoring (1-4 weeks)
-  const hasACEARB = allRecs.some(
-    (r) =>
-      (r.action === 'ADD' || r.action === 'INCREASE') &&
-      (r.medication.toLowerCase().includes('lisinopril') || r.medication.toLowerCase().includes('losartan'))
-  );
-
-  const hasSGLT2i = allRecs.some(
-    (r) =>
-      r.medication.toLowerCase().includes('empagliflozin') || r.medication.toLowerCase().includes('dapagliflozin')
-  );
-
-  if (hasACEARB || hasSGLT2i) {
-    plan.shortTerm.push({
-      timing: '2 Weeks',
-      tests: ['Basic metabolic panel (Cr, eGFR, K+, Na+)'],
-      purpose: hasACEARB
-        ? 'Safety check after ACE-I/ARB initiation/increase; baseline for SGLT2i'
-        : 'Baseline renal function for SGLT2i',
-      action: hasACEARB ? 'Hold ACE-I/ARB if K+ >5.5 or Cr increase >30%' : undefined,
-    });
+export function buildMonitoringPlan(domains: ClinicalDomain[], patientData: PatientData, calculations: ClinicalCalculations): MonitoringPlan {
+  const plan: MonitoringPlan = { shortTerm: [], mediumTerm: [], longTerm: [] };
+  if (calculations.bpClassification === 'Hypertensive Crisis' || (patientData.labs.potassium ?? 0) >= 6) {
+    plan.shortTerm.push({ timing: 'Now', tests: ['Prompt clinical assessment, repeat measurement and targeted testing'], purpose: 'Assess acute target-organ injury or clinically significant hyperkalemia before routine optimization.' });
+    return plan;
   }
-
-  // Home BP monitoring
-  const hasBPRecs = domains.some((d) => d.name === 'BLOOD_PRESSURE' && d.recommendations.length > 0);
-  if (hasBPRecs) {
-    plan.shortTerm.push({
-      timing: 'Ongoing',
-      tests: ['Home BP monitoring: 2 readings twice daily x 1 week, then weekly'],
-      purpose: 'Assess response to BP medication changes',
-    });
-  }
-
-  // Medium-term monitoring (3 months)
-  const hasStatinChange = allRecs.some((r) => r.medication.toLowerCase().includes('statin'));
-  if (hasStatinChange) {
-    plan.mediumTerm.push({
-      timing: '3 Months',
-      tests: ['Lipid panel'],
-      purpose: 'Assess LDL response to statin therapy',
-      action: 'Consider adding ezetimibe if LDL not at goal',
-    });
-  }
-
-  if (patientData.history.diabetes) {
-    plan.mediumTerm.push({
-      timing: '3 Months',
-      tests: ['Hemoglobin A1c'],
-      purpose: 'Assess glucose control (goal <7%)',
-    });
-  }
-
-  if (onDialysis) {
-    plan.mediumTerm.push({
-      timing: 'Monthly (align with dialysis labs)',
-      tests: ['BMP with potassium/bicarbonate', 'Calcium/phosphorus'],
-      purpose: 'Assess BP tolerance and electrolytes when adjusting cardio-renal medications in ESKD',
-    });
-  }
-
-  if (hasACEARB || hasSGLT2i) {
-    plan.mediumTerm.push({
-      timing: '3 Months',
-      tests: ['Basic metabolic panel'],
-      purpose: 'Monitor renal function',
-    });
-  }
-
-  // Long-term monitoring
-  if (patientData.history.diabetes || patientData.history.ckd || calculations.egfr < 60 || onDialysis) {
-    if (onDialysis) {
-      plan.longTerm.push({
-        timing: 'Quarterly',
-        tests: ['Dialysis labs (BMP, calcium/phosphorus)', 'Review dry weight and BP log'],
-        purpose: 'Track electrolyte shifts and BP goals while on dialysis and cardio-renal therapies',
-      });
-    } else {
-      plan.longTerm.push({
-        timing: '6 Months',
-        tests: ['Comprehensive metabolic panel', 'Urine albumin-to-creatinine ratio (UACR)'],
-        purpose: 'Monitor proteinuria in CKD/diabetes; guides ACE-I effectiveness',
-      });
-    }
-  }
-
-  plan.longTerm.push({
-    timing: 'Annually',
-    tests: ['Reassess ASCVD risk, review all risk factors', 'Comprehensive labs (CMP, lipids, A1c, UACR)'],
-    purpose: 'Comprehensive cardiovascular risk reassessment',
+  const changes = domains.flatMap(d => d.recommendations).filter(r => ['ADD', 'INCREASE', 'SWITCH', 'CONSIDER'].includes(r.action));
+  const includes = (pattern: RegExp) => changes.some(r => pattern.test(r.medication));
+  if (includes(/lisinopril|losartan|sacubitril|valsartan|chlorthalidone/i)) plan.shortTerm.push({
+    timing: 'Within 1–2 weeks after an agreed medication change', tests: ['Basic metabolic panel and BP review'],
+    purpose: 'Check kidney function, electrolytes, volume status and tolerability; obtain baseline results before initiation.',
+    action: 'Promptly reassess significant creatinine or potassium changes and reversible causes; individualize holding/reducing therapy.',
   });
-
+  if (includes(/spironolactone|eplerenone/i)) plan.shortTerm.push({
+    timing: 'If MRA initiated: about 3 days, 1 week, then monthly for 3 months', tests: ['Potassium and creatinine/eGFR'],
+    purpose: 'Detect hyperkalemia and worsening kidney function after initiation or dose changes.',
+  });
+  if (includes(/finerenone/i)) plan.shortTerm.push({
+    timing: 'If finerenone initiated: 4 weeks, with earlier checks when indicated', tests: ['Potassium and eGFR'],
+    purpose: 'Review eligibility and dose; arrange additional early potassium monitoring if baseline K is >4.8–5.0.',
+  });
+  if (includes(/empagliflozin|dapagliflozin/i)) plan.shortTerm.push({
+    timing: 'Before initiation and early follow-up individualized to renal/volume risk', tests: ['Renal function and volume-status review'],
+    purpose: 'Confirm SGLT2 indication and renal eligibility; discuss adverse effects and sick-day/perioperative holds.',
+  });
+  if (domains.some(d => d.name === 'BLOOD_PRESSURE')) plan.shortTerm.push({
+    timing: 'Ongoing', tests: ['Home BP log using validated equipment and correct technique'], purpose: 'Confirm the BP pattern and response to agreed treatment changes.',
+  });
+  if (includes(/statin|ezetimibe|nonstatin/i)) plan.mediumTerm.push({
+    timing: '4–12 weeks after a treatment change', tests: ['Lipid panel'], purpose: 'Assess response and adherence before further intensification.',
+  });
+  if (patientData.history.diabetes && domains.some(d => d.name === 'DIABETES_CARDIORENAL')) plan.mediumTerm.push({
+    timing: 'About 3 months after a treatment change', tests: ['Hemoglobin A1c'], purpose: `Assess glucose control against an individualized goal (usual goal <${calculations.a1cGoal}%).`,
+  });
+  if (domains.length) plan.longTerm.push({
+    timing: 'Individualized follow-up', tests: ['Reassess selected conditions, adherence, tolerability and patient priorities'], purpose: 'Use the domain-specific guidance above to select tests and intervals; this is not a standing laboratory order set.',
+  });
   return plan;
 }
