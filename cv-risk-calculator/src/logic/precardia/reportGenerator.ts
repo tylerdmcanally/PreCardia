@@ -1,26 +1,18 @@
 // PreCardia Report Generator
 
-import { PreCardiaData, FunctionalCapacityInfo, DASIResult } from '../../types/precardia.types';
+import { PreCardiaData, DASIResult } from '../../types/precardia.types';
 import {
   calculateRCRI,
   calculateDASI,
   calculateEGFR,
   calculateBMI,
-  getFunctionalCapacityCategory,
+  assessFunctionalCapacity,
   convertPoundsToKg,
   convertInchesToCm
 } from './calculations';
 import { generateRecommendations } from './recommendations';
-import { SURGICAL_RISK, METS_VALUES, TROPONIN_ASSAY_LIMITS } from './constants';
-import { getImagingRecommendations, type ImagingInput } from '../imaging/imagingRecommendations';
-import { APPROPRIATENESS_DEFINITIONS } from '../../data/imagingGuidelines';
-
-const FUNCTIONAL_CAPACITY_CATEGORIES = ['excellent', 'good', 'moderate', 'poor', 'unknown'] as const;
-type FunctionalCapacityCategory = (typeof FUNCTIONAL_CAPACITY_CATEGORIES)[number];
-
-const isFunctionalCapacityCategory = (value: string): value is FunctionalCapacityCategory =>
-  FUNCTIONAL_CAPACITY_CATEGORIES.includes(value as FunctionalCapacityCategory);
-
+import { TROPONIN_ASSAY_LIMITS } from './constants';
+import { getSurgicalRisk, PERIOPERATIVE_GUIDELINE } from './guideline';
 const formatOneDecimal = (value: number): string => Number(Number(value).toFixed(1)).toString();
 
 const getSexLabel = (sex: PreCardiaData['sex']): string => {
@@ -35,33 +27,14 @@ const getSexLabel = (sex: PreCardiaData['sex']): string => {
 };
 
 export function generatePreCardiaReport(data: PreCardiaData): string {
-  // Calculate functional capacity
-  const usesDASI = Boolean(data.useDASI);
-  let functionalCapacityInfo: FunctionalCapacityInfo;
-  let dasiResults: DASIResult | null = null;
-
-  if (usesDASI) {
-    dasiResults = calculateDASI(data);
-    functionalCapacityInfo = getFunctionalCapacityCategory(dasiResults.mets);
-  } else {
-    const capacity = data.functionalCapacity || 'unknown';
-    const category: FunctionalCapacityCategory = isFunctionalCapacityCategory(capacity) ? capacity : 'unknown';
-    functionalCapacityInfo = {
-      value: METS_VALUES[category]?.value || 'Unknown',
-      description: METS_VALUES[category]?.description || 'Unknown',
-      category,
-    };
+  if (!Number.isInteger(data.age) || data.age < 18) {
+    throw new Error('PreCardia applies to adults age 18 and older.');
   }
-
-  // Calculate RCRI
+  const usesDASI = Boolean(data.useDASI);
+  const dasiResults: DASIResult | null = usesDASI && data.dasiCompleted ? calculateDASI(data) : null;
+  const functionalCapacityInfo = assessFunctionalCapacity(data);
   const rcri = calculateRCRI(data);
-
-  // Get surgical risk
-  const surgeryRisk = SURGICAL_RISK[data.surgeryType] || {
-    level: 'Variable',
-    risk: 'Variable',
-    description: data.otherSurgery || 'Unknown'
-  };
+  const surgeryRisk = getSurgicalRisk(data);
 
   // Generate recommendations
   const recommendations = generateRecommendations(data, rcri, surgeryRisk, functionalCapacityInfo);
@@ -77,7 +50,8 @@ export function generatePreCardiaReport(data: PreCardiaData): string {
 
   report.push('=' .repeat(80));
   report.push('PRECARDIA - CARDIAC PRE-OPERATIVE RISK ASSESSMENT REPORT');
-  report.push('Based on 2024 ACC/AHA/ACCP/HRS Guidelines');
+  report.push(`Based on ${PERIOPERATIVE_GUIDELINE.label}`);
+  report.push(PERIOPERATIVE_GUIDELINE.note);
   report.push('='.repeat(80));
   report.push('');
 
@@ -136,7 +110,9 @@ export function generatePreCardiaReport(data: PreCardiaData): string {
   const conditions: string[] = [];
   if (data.ischemicHeartDisease) conditions.push('Ischemic heart disease');
   if (data.heartFailure) conditions.push('Heart failure');
-  if (data.cerebrovascularDisease) conditions.push('Cerebrovascular disease');
+  if (data.cerebrovascularDisease) conditions.push(`Cerebrovascular disease (most recent stroke/TIA: ${data.strokeTiming === 'lt3mo' ? '<3 months' : data.strokeTiming === 'ge3mo' ? '≥3 months' : 'unknown timing'})`);
+  if (data.cardiovascularSymptoms) conditions.push('Cardiovascular symptoms reported');
+  if (data.newOrWorseningDyspnea) conditions.push('New dyspnea or suspected worsening ventricular function');
   if (data.diabetesInsulin) conditions.push('Diabetes requiring insulin');
   if (data.renalDysfunction) conditions.push('Renal dysfunction');
   if (data.hypertension) conditions.push('Hypertension');
@@ -217,16 +193,17 @@ export function generatePreCardiaReport(data: PreCardiaData): string {
   report.push('');
 
   // Lab values
-  if (data.creatinine || data.bnp || data.ntproBNP || data.troponin) {
+  if ([data.creatinine, data.bnp, data.ntproBNP, data.troponin].some(value => value !== undefined)) {
     report.push('LABORATORY VALUES');
     report.push('-'.repeat(80));
     if (data.creatinine) {
       report.push(`Creatinine: ${data.creatinine} mg/dL`);
-      if (egfr) report.push(`eGFR (CKD-EPI 2021): ${egfr} mL/min/1.73m²`);
+      if (egfr !== null) report.push(`eGFR (CKD-EPI 2021): ${egfr} mL/min/1.73m² (not creatinine clearance for drug dosing)`);
+      else report.push('eGFR not calculated: confirm the inputs required by the CKD-EPI equation.');
     }
-    if (data.bnp) report.push(`BNP: ${data.bnp} pg/mL`);
-    if (data.ntproBNP) report.push(`NT-proBNP: ${data.ntproBNP} pg/mL`);
-    if (data.troponin) {
+    if (data.bnp !== undefined) report.push(`BNP: ${data.bnp} pg/mL`);
+    if (data.ntproBNP !== undefined) report.push(`NT-proBNP: ${data.ntproBNP} pg/mL`);
+    if (data.troponin !== undefined) {
       const assayLabel = data.troponinAssay ? TROPONIN_ASSAY_LIMITS[data.troponinAssay]?.label ?? data.troponinAssay : undefined;
       const upperLimitText = data.troponinUpperLimit ? ` | 99th percentile ${data.troponinUpperLimit} ng/mL` : '';
       if (assayLabel) {
@@ -258,6 +235,11 @@ export function generatePreCardiaReport(data: PreCardiaData): string {
       des: 'Drug-eluting stent'
     };
     const stentTimingMap: Record<string, string> = {
+      le30d: '≤30 days',
+      'gt30d-lt3mo': '>30 days to <3 calendar months',
+      '3to6mo': '3 to <6 calendar months',
+      '6to12mo': '6 to <12 calendar months',
+      ge12mo: '≥12 calendar months',
       lt2w: '<2 weeks',
       '2to4w': '2-4 weeks',
       '4to12w': '4-12 weeks',
@@ -265,8 +247,11 @@ export function generatePreCardiaReport(data: PreCardiaData): string {
       unknown: 'Unknown timing'
     };
     const typeLabel = stentTypeMap[data.stentType] || data.stentType;
-    const timingLabel = data.stentTiming ? stentTimingMap[data.stentTiming] || data.stentTiming : 'Timing not specified';
+    const timing = data.pciTiming || data.stentTiming;
+    const timingLabel = timing ? stentTimingMap[timing] || timing : 'Timing not specified';
     interventionDetails.push(`Coronary stent: ${typeLabel} (${timingLabel})`);
+    interventionDetails.push(`PCI indication: ${data.pciIndication === 'acs' ? 'ACS' : data.pciIndication === 'ccd' ? 'Chronic coronary disease' : 'Unknown'}`);
+    interventionDetails.push(`Antiplatelet interruption required: ${data.antiplateletInterruption || 'unknown'}`);
   }
   if (data.cabg === 'yes') {
     const cabgTimingMap: Record<string, string> = {
@@ -297,6 +282,8 @@ export function generatePreCardiaReport(data: PreCardiaData): string {
     interventionDetails.push(`TEER/MitraClip within past year: ${teerLabel}`);
   }
 
+  if (data.balloonAngioplasty) interventionDetails.push(`Balloon angioplasty without stent: ${data.balloonTiming === 'lt14d' ? '<14 days' : data.balloonTiming === 'ge14d' ? '≥14 days' : 'Unknown timing'}`);
+
   if (interventionDetails.length > 0) {
     report.push('RECENT CARDIAC INTERVENTIONS');
     report.push('-'.repeat(80));
@@ -308,7 +295,7 @@ export function generatePreCardiaReport(data: PreCardiaData): string {
   const meds: string[] = [];
   if (data.betaBlocker) meds.push('Beta-blocker');
   if (data.statin) meds.push('Statin');
-  if (data.aceARB) meds.push('ACE inhibitor/ARB');
+  if (data.aceARB) meds.push(`ACE inhibitor/ARB (indication: ${data.raasIndication || 'unknown'}; BP control: ${data.bloodPressureControlled ? 'reported controlled' : 'not confirmed'})`);
   if (data.sglt2i) meds.push('SGLT2 inhibitor');
   if (data.anticoagulant) meds.push('Anticoagulant');
   if (data.antiplatelet) meds.push('Antiplatelet');
@@ -333,9 +320,9 @@ export function generatePreCardiaReport(data: PreCardiaData): string {
     report.push(`DASI score: ${dasiResults.score.toFixed(1)}`);
     report.push(`Estimated VO₂peak: ${dasiResults.vo2peak.toFixed(1)} mL/kg/min`);
     report.push(`Functional capacity: ${functionalCapacityInfo.description}`);
-    report.push(`METs: ${functionalCapacityInfo.value}`);
+    report.push(`Formula-estimated METs: ${dasiResults.mets.toFixed(1)} (DASI ≤34 independently denotes poor capacity)`);
   } else {
-    report.push('Assessment method: Clinical estimation');
+    report.push(usesDASI ? 'Assessment method: DASI incomplete — capacity unknown' : 'Assessment method: Clinical estimation');
     report.push(`Functional capacity: ${functionalCapacityInfo.description}`);
     report.push(`METs: ${functionalCapacityInfo.value}`);
   }
@@ -345,12 +332,12 @@ export function generatePreCardiaReport(data: PreCardiaData): string {
   report.push('SURGICAL DETAILS');
   report.push('-'.repeat(80));
   report.push(`Procedure: ${surgeryRisk.description}`);
-  report.push(`Surgical Risk: ${surgeryRisk.level} (${surgeryRisk.risk} 30-day MACE risk)`);
+  report.push(`Procedure risk category: ${surgeryRisk.level === 'High' && data.otherSurgeryRisk === 'elevated' ? 'Elevated' : surgeryRisk.level} (${surgeryRisk.risk}; broad procedural estimate, not individualized MACE probability)`);
   const urgencyMap = {
     emergency: 'Emergency (<2 hours)',
-    urgent: 'Urgent (2-24 hours)',
+    urgent: 'Urgent (≥2 to <24 hours)',
     'time-sensitive': 'Time-sensitive (≤3 months)',
-    elective: 'Elective (>3 months)'
+    elective: 'Elective (can delay for evaluation and management)'
   };
   report.push(`Urgency: ${urgencyMap[data.surgeryUrgency]}`);
   report.push('');
@@ -359,7 +346,12 @@ export function generatePreCardiaReport(data: PreCardiaData): string {
   report.push('REVISED CARDIAC RISK INDEX (RCRI)');
   report.push('-'.repeat(80));
   report.push(`RCRI Score: ${rcri.score} / ${rcri.maxScore} points`);
-  report.push(`30-day MACE Risk: ${rcri.maceRisk}`);
+  report.push('RCRI >1 denotes elevated calculated risk (Table 4 / Figure 1).');
+  report.push('RCRI predicts major cardiac complications; no fixed individualized 30-day MACE percentage is assigned.');
+  if (data.surgeryType === 'other') report.push(`RCRI high-risk surgical criterion: ${data.otherRcriHighRisk || 'unknown'}${!data.otherRcriHighRisk || data.otherRcriHighRisk === 'unknown' ? ' — score is provisional until confirmed' : ''}.`);
+  if (data.riskCalculator && Number.isFinite(data.estimatedMaceRisk)) {
+    report.push(`Additional clinician-entered risk estimate (${data.riskCalculator}): ${data.estimatedMaceRisk}% — verify calculator endpoint and inputs.`);
+  }
   report.push(`Risk Level: ${rcri.riskLevel}`);
   if (rcri.riskFactors.length > 0) {
     report.push('');
@@ -400,84 +392,6 @@ export function generatePreCardiaReport(data: PreCardiaData): string {
     });
   }
 
-  // Imaging recommendations based on 2024 ACC/AHA Appropriate Use Criteria
-  // Determine numeric METs for imaging algorithm
-  let numericMETs: number | null = null;
-  if (usesDASI && dasiResults) {
-    numericMETs = dasiResults.mets;
-  } else {
-    // Convert functional capacity category to approximate METs
-    const capacity = data.functionalCapacity || 'unknown';
-    if (capacity === 'excellent') numericMETs = 10;
-    else if (capacity === 'good') numericMETs = 8;
-    else if (capacity === 'moderate') numericMETs = 5;
-    else if (capacity === 'poor') numericMETs = 2;
-    // else remains null for 'unknown'
-  }
-
-  const imagingInput: ImagingInput = {
-    hasKnownHeartDisease: Boolean(data.ischemicHeartDisease || data.heartFailure || data.valvularHeartDisease),
-    hasNewOrWorseningSymptoms: Boolean(data.unstableAngina || data.decompensatedHF),
-    functionalCapacityMETs: numericMETs,
-    hasCAD: Boolean(data.ischemicHeartDisease),
-    hasHeartFailure: Boolean(data.heartFailure),
-    heartFailureClass: data.decompensatedHF ? 'IV' : undefined,
-    hasValvularDisease: Boolean(data.valvularHeartDisease),
-    hasRecentMI: data.recentMI === 'yes',
-    hasRecentHFHospitalization: Boolean(data.decompensatedHF),
-    surgeryType: data.otherSurgery || data.surgeryType,
-    surgeryRisk: surgeryRisk.level === 'Low' ? 'LOW' : 
-                 surgeryRisk.level === 'Intermediate' ? 'INTERMEDIATE' :
-                 surgeryRisk.level === 'High' ? 'HIGH' : 'INTERMEDIATE',
-    hasPriorTestingWithin90Days: false // Could be added as a form field in the future
-  };
-
-  const imagingRecs = getImagingRecommendations(imagingInput);
-
-  report.push('PREOPERATIVE CARDIAC IMAGING RECOMMENDATIONS');
-  report.push('-'.repeat(80));
-  report.push(`Clinical Scenario: ${imagingRecs.scenario.description}`);
-  report.push('');
-  report.push(`Surgery Risk: ${surgeryRisk.level} (${surgeryRisk.risk})`);
-  report.push(`Functional Capacity: ${functionalCapacityInfo.description}`);
-  report.push('');
-
-  if (imagingRecs.appropriateModalities.length > 0) {
-    report.push('APPROPRIATE (A) - Generally acceptable and reasonable approach:');
-    imagingRecs.appropriateModalities.forEach(rec => {
-      report.push(`  • ${rec.modality} (Median Score: ${rec.median}/9)`);
-    });
-    report.push('');
-  }
-
-  if (imagingRecs.mayBeAppropriateModalities.length > 0) {
-    report.push('MAY BE APPROPRIATE (M) - May be acceptable, more research needed:');
-    imagingRecs.mayBeAppropriateModalities.forEach(rec => {
-      report.push(`  • ${rec.modality} (Median Score: ${rec.median}/9)`);
-    });
-    report.push('');
-  }
-
-  if (imagingRecs.rarelyAppropriateModalities.length > 0) {
-    report.push('RARELY APPROPRIATE (R) - Not generally acceptable:');
-    imagingRecs.rarelyAppropriateModalities.forEach(rec => {
-      report.push(`  • ${rec.modality} (Median Score: ${rec.median}/9)`);
-    });
-    report.push('');
-  }
-
-  if (imagingRecs.clinicalGuidance.length > 0) {
-    report.push('Clinical Guidance:');
-    imagingRecs.clinicalGuidance.forEach((guidance, i) => {
-      report.push(`  ${i + 1}. ${guidance}`);
-    });
-    report.push('');
-  }
-
-  report.push('Reference: 2024 ACC/AHA Appropriate Use Criteria for Multimodality Imaging');
-  report.push('(JACC 2024;84(15):1455-1491)');
-  report.push('');
-
   // Testing principles
   report.push('GENERAL PERIOPERATIVE TESTING PRINCIPLES');
   report.push('-'.repeat(80));
@@ -502,10 +416,14 @@ export function generatePreCardiaReport(data: PreCardiaData): string {
     report.push('FRAILTY ASSESSMENT');
     report.push('-'.repeat(80));
     report.push(`Clinical Frailty Scale: ${data.frailtyScore} - ${frailtyDescriptions[data.frailtyScore] || 'Not specified'}`);
-    if (data.frailtyScore >= 6) {
+    if (data.frailtyScore === 9) {
+      report.push('Clinical Frailty Scale category: Terminally ill (not a stand-alone frailty severity).');
+    } else if (data.frailtyScore >= 6) {
       report.push('Frailty Level: Moderate to severe');
-    } else if (data.frailtyScore >= 4) {
+    } else if (data.frailtyScore === 5) {
       report.push('Frailty Level: Mild');
+    } else if (data.frailtyScore === 4) {
+      report.push('Clinical Frailty Scale category: Vulnerable / very mild frailty; Table 6 identifies categories 5–8 as frailty.');
     } else {
       report.push('Frailty Level: Non-frail');
     }
@@ -520,8 +438,8 @@ export function generatePreCardiaReport(data: PreCardiaData): string {
   report.push('clinical judgment. Healthcare providers should use this tool in conjunction with');
   report.push('their professional expertise and in accordance with local clinical guidelines.');
   report.push('');
-  report.push('Reference: 2024 ACC/AHA/ACCP/HRS Guideline for Perioperative Cardiovascular');
-  report.push('Evaluation and Management for Noncardiac Surgery');
+  report.push(`Reference: ${PERIOPERATIVE_GUIDELINE.citation}`);
+  report.push(PERIOPERATIVE_GUIDELINE.url);
   report.push('');
   report.push(`Generated: ${new Date().toLocaleString()}`);
   report.push('='.repeat(80));

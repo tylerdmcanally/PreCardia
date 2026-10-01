@@ -1,14 +1,16 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PreCardiaData } from '../types/precardia.types';
 import { generatePreCardiaReport } from '../logic/precardia/reportGenerator';
+import { PerioperativeContextFields, type PerioperativeContext } from '../components/PerioperativeContextFields';
+import { PERIOPERATIVE_GUIDELINE } from '../logic/precardia/guideline';
 import { TROPONIN_ASSAY_LIMITS } from '../logic/precardia/constants';
-import { calculateDASI, getFunctionalCapacityCategory } from '../logic/precardia/calculations';
+import { calculateDASI, getDASIFunctionalCapacity } from '../logic/precardia/calculations';
 import { ArrowLeft, FileText, Copy, Printer, ChevronDown, ChevronUp } from 'lucide-react';
 
 type MiTimingOption = '' | 'lt4w' | '4to8w' | 'gt8w' | 'unknown';
 type StentTypeOption = '' | 'bms' | 'des' | 'none';
-type StentTimingOption = '' | 'lt2w' | '2to4w' | '4to12w' | 'gt12w';
+type StentTimingOption = '' | NonNullable<PreCardiaData['pciTiming']>;
 type CabgTimingOption = '' | 'lt6w' | '6wto3mo' | 'gt3mo';
 type TavrTimingOption = '' | 'lt4w' | 'gt4w';
 type FunctionalCapacityOption = 'excellent' | 'good' | 'moderate' | 'poor' | 'unknown';
@@ -38,6 +40,8 @@ const getTroponinDefaultLimit = (assayKey: string, patientSex: 'male' | 'female'
 };
 
 export function PreCardia() {
+  const [guidelineContext, setGuidelineContext] = useState<PerioperativeContext>({});
+  const [dasiCompleted, setDasiCompleted] = useState(false);
   const [report, setReport] = useState<string | null>(null);
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
     new Set(['demographics', 'activeConditions', 'history', 'devices', 'surgical'])
@@ -151,8 +155,8 @@ export function PreCardia() {
     const validationErrors: string[] = [];
 
     const ageValue = parseInt(age, 10);
-    if (!age || Number.isNaN(ageValue) || ageValue <= 0) {
-      validationErrors.push('Enter a valid patient age.');
+    if (!age || Number.isNaN(ageValue) || ageValue < 18 || !Number.isInteger(Number(age))) {
+      validationErrors.push('Enter an adult patient age (18 years or older).');
     }
 
     if (!surgeryType) {
@@ -203,12 +207,33 @@ export function PreCardia() {
       }
     }
 
+    if (guidelineContext.estimatedMaceRisk !== undefined && (!guidelineContext.riskCalculator || !Number.isFinite(guidelineContext.estimatedMaceRisk) || guidelineContext.estimatedMaceRisk < 0 || guidelineContext.estimatedMaceRisk > 100)) {
+      validationErrors.push('Select the validated risk calculator and enter a cardiac event risk from 0 to 100%.');
+    }
+    if (guidelineContext.riskCalculator && guidelineContext.estimatedMaceRisk === undefined) {
+      validationErrors.push('Enter the cardiac event estimate from the selected calculator, or select Not supplied.');
+    }
+    for (const [name, value] of [['Creatinine', creatinine], ['BNP', bnp], ['NT-proBNP', ntproBNP], ['Troponin', troponin], ['Troponin upper limit', troponinUpperLimit]]) {
+      if (value.trim() !== '' && (!Number.isFinite(Number(value)) || Number(value) < 0 || ((name === 'Creatinine' || name === 'Troponin upper limit') && Number(value) === 0))) {
+        validationErrors.push(`Enter a valid ${name} value.`);
+      }
+    }
+
     if (validationErrors.length > 0) {
       alert(`Please address the following before generating the report:\n\n- ${validationErrors.join('\n- ')}`);
       return;
     }
 
     const data: PreCardiaData = {
+      ...guidelineContext,
+      strokeTiming: cerebrovascularDisease ? guidelineContext.strokeTiming : undefined,
+      pciIndication: stentType === 'des' || stentType === 'bms' ? guidelineContext.pciIndication : undefined,
+      antiplateletInterruption: stentType === 'des' || stentType === 'bms' ? guidelineContext.antiplateletInterruption : undefined,
+      balloonAngioplasty: !stentType || stentType === 'none' ? guidelineContext.balloonAngioplasty : false,
+      raasIndication: aceARB ? guidelineContext.raasIndication : undefined,
+      otherSurgeryRisk: surgeryType === 'other' ? guidelineContext.otherSurgeryRisk : undefined,
+      otherRcriHighRisk: surgeryType === 'other' ? guidelineContext.otherRcriHighRisk : undefined,
+      dasiCompleted,
       age: parseInt(age) || 0,
       sex,
       weight: parseFloat(weight) || 0,
@@ -243,7 +268,7 @@ export function PreCardia() {
       recentMI,
       miTiming: miTiming || undefined,
       stentType: stentType || undefined,
-      stentTiming: stentTiming || undefined,
+      pciTiming: stentType === 'bms' || stentType === 'des' ? stentTiming || undefined : undefined,
       cabg,
       cabgTiming: cabgTiming || undefined,
       tavrTavi,
@@ -328,7 +353,7 @@ export function PreCardia() {
           </Link>
           <h1 className="text-3xl font-bold text-cardio-primary mb-2">PreCardia</h1>
           <p className="text-gray-600">Cardiac Pre-Operative Risk Assessment Tool</p>
-          <p className="text-sm text-gray-500">Based on 2024 ACC/AHA/ACCP/HRS Perioperative Guidelines and 2024 ACC/AHA Preoperative Imaging Appropriate Use Criteria</p>
+          <p className="text-sm text-gray-500">Based on the <a className="underline" href={PERIOPERATIVE_GUIDELINE.url} target="_blank" rel="noreferrer">2026 AHA/ACC multisociety perioperative guideline</a> (2024 recommendations reaffirmed)</p>
         </div>
 
         {/* Demographics Section */}
@@ -549,7 +574,7 @@ export function PreCardia() {
                     onChange={(e) => setRenalDysfunction(e.target.checked)}
                     className="mt-1 mr-3"
                   />
-                  <span>Renal Dysfunction (Creatinine &gt;2.0 mg/dL or dialysis)</span>
+                  <span>Serum creatinine ≥2.0 mg/dL (RCRI renal criterion)</span>
                 </label>
 
                 <label className="flex items-start cursor-pointer">
@@ -918,7 +943,7 @@ export function PreCardia() {
                   </label>
                   <select
                     value={stentType}
-                    onChange={(e) => setStentType(e.target.value as StentTypeOption)}
+                    onChange={(e) => { setStentType(e.target.value as StentTypeOption); setStentTiming(''); }}
                     className="w-full px-3 py-2 border-2 border-cardio-border rounded focus:border-cardio-secondary focus:outline-none"
                   >
                     <option value="">No stent</option>
@@ -937,10 +962,12 @@ export function PreCardia() {
                       className="w-full px-3 py-2 border-2 border-cardio-border rounded focus:border-cardio-secondary focus:outline-none"
                     >
                       <option value="">Select...</option>
-                      <option value="lt2w">&lt;2 weeks</option>
-                      <option value="2to4w">2-4 weeks</option>
-                      <option value="4to12w">4-12 weeks</option>
-                      <option value="gt12w">&gt;12 weeks</option>
+                      <option value="le30d">≤30 days</option>
+                      <option value="gt30d-lt3mo">&gt;30 days to &lt;3 calendar months</option>
+                      <option value="3to6mo">3 to &lt;6 calendar months</option>
+                      <option value="6to12mo">6 to &lt;12 calendar months</option>
+                      <option value="ge12mo">≥12 calendar months</option>
+                      <option value="unknown">Unknown</option>
                     </select>
                   </div>
                 )}
@@ -1250,6 +1277,12 @@ export function PreCardia() {
           )}
         </section>
 
+        <PerioperativeContextFields
+          value={guidelineContext} onChange={setGuidelineContext}
+          hasStroke={cerebrovascularDisease} hasStent={stentType === 'des' || stentType === 'bms'}
+          takesRaas={aceARB} takesBetaBlocker={betaBlocker} otherSurgery={surgeryType === 'other'}
+        />
+
         {/* Functional Capacity */}
         <section className="bg-white rounded-lg shadow-cardio mb-4">
           <button
@@ -1334,14 +1367,19 @@ export function PreCardia() {
                     </div>
                   ))}
 
+                  <label className="flex items-start gap-3 mt-4">
+                    <input type="checkbox" checked={dasiCompleted} onChange={e => setDasiCompleted(e.target.checked)} />
+                    <span>I have reviewed all 12 DASI activities with the patient (unchecked activities mean unable).</span>
+                  </label>
+                  <p className="text-sm text-gray-600 mt-2">DASI ≤34 denotes poor functional capacity for this guideline even if estimated METs exceed 4.</p>
                   {/* DASI Score Calculation */}
                   {(() => {
                     const dasiData: Partial<PreCardiaData> = {
                       dasi1, dasi2, dasi3, dasi4, dasi5, dasi6,
                       dasi7, dasi8, dasi9, dasi10, dasi11, dasi12
                     };
-                    const dasiResult = calculateDASI(dasiData as PreCardiaData);
-                    const capacityCategory = getFunctionalCapacityCategory(dasiResult.mets);
+                    const dasiResult = calculateDASI(dasiData);
+                    const capacityCategory = getDASIFunctionalCapacity(dasiResult);
                     return (
                       <div className="mt-6 pt-4 border-t border-cardio-border bg-cardio-primary/5 rounded-lg p-4">
                         <h4 className="text-sm font-semibold text-cardio-primary mb-3">DASI Score Calculation</h4>
@@ -1361,7 +1399,7 @@ export function PreCardia() {
                           <div className="col-span-2">
                             <span className="text-gray-600">Functional Capacity:</span>
                             <span className="ml-2 font-semibold text-cardio-secondary">
-                              {capacityCategory.description}
+                              {dasiCompleted ? capacityCategory.description : 'Unknown — confirm questionnaire completion'}
                             </span>
                           </div>
                         </div>
@@ -1466,9 +1504,9 @@ export function PreCardia() {
                   className="w-full px-3 py-2 border-2 border-cardio-border rounded focus:border-cardio-secondary focus:outline-none"
                   required
                 >
-                  <option value="elective">Elective (&gt;3 months)</option>
+                  <option value="elective">Elective (can delay for evaluation)</option>
                   <option value="time-sensitive">Time-sensitive (≤3 months)</option>
-                  <option value="urgent">Urgent (2-24 hours)</option>
+                  <option value="urgent">Urgent (≥2 to &lt;24 hours)</option>
                   <option value="emergency">Emergency (&lt;2 hours)</option>
                 </select>
               </div>

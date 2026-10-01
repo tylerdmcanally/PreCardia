@@ -13,6 +13,8 @@ export interface PreCardiaData {
   decompensatedHF: boolean;
   significantArrhythmia: boolean;
   severeValvularDisease: boolean;
+  cardiovascularSymptoms?: boolean;
+  newOrWorseningDyspnea?: boolean;
   valvularHeartDisease?: boolean;
   valvularType?: 'aortic-stenosis' | 'aortic-regurgitation' | 'mitral-stenosis' | 'mitral-regurgitation' | 'tricuspid' | 'pulmonary' | 'multiple';
   valvularSeverity?: 'mild' | 'moderate' | 'severe';
@@ -21,6 +23,7 @@ export interface PreCardiaData {
   ischemicHeartDisease: boolean;
   heartFailure: boolean;
   cerebrovascularDisease: boolean;
+  strokeTiming?: 'lt3mo' | 'ge3mo' | 'unknown';
   diabetesInsulin: boolean;
   renalDysfunction: boolean;
 
@@ -41,6 +44,12 @@ export interface PreCardiaData {
   miTiming?: '' | 'lt4w' | '4to8w' | 'gt8w' | 'unknown';
   stentType?: '' | 'bms' | 'des' | 'none';
   stentTiming?: '' | 'lt2w' | '2to4w' | '4to12w' | 'gt12w';
+  // Legacy week ranges above are retained for old callers; never infer months from them.
+  pciTiming?: 'le30d' | 'gt30d-lt3mo' | '3to6mo' | '6to12mo' | 'ge12mo' | 'unknown';
+  pciIndication?: 'acs' | 'ccd' | 'unknown';
+  antiplateletInterruption?: 'yes' | 'no' | 'unknown';
+  balloonAngioplasty?: boolean;
+  balloonTiming?: 'lt14d' | 'ge14d' | 'unknown';
   cabg: 'yes' | 'no';
   cabgTiming?: '' | 'lt6w' | '6wto3mo' | 'gt3mo';
   tavrTavi: 'yes' | 'no';
@@ -60,6 +69,9 @@ export interface PreCardiaData {
   betaBlocker: boolean;
   statin: boolean;
   aceARB: boolean;
+  raasIndication?: 'hypertension' | 'hfref' | 'other' | 'unknown';
+  bloodPressureControlled?: boolean;
+  newBetaBlockerIndication?: boolean;
   sglt2i: boolean;
   anticoagulant: boolean;
   antiplatelet?: boolean;
@@ -67,6 +79,7 @@ export interface PreCardiaData {
   // Functional Capacity
   functionalCapacity?: 'excellent' | 'good' | 'moderate' | 'poor' | 'unknown';
   useDASI?: boolean;
+  dasiCompleted?: boolean;
   dasi1?: boolean;
   dasi2?: boolean;
   dasi3?: boolean;
@@ -84,6 +97,10 @@ export interface PreCardiaData {
   surgeryType: string;
   otherSurgery?: string;
   surgeryUrgency: 'emergency' | 'urgent' | 'time-sensitive' | 'elective';
+  otherSurgeryRisk?: 'low' | 'elevated' | 'unknown';
+  otherRcriHighRisk?: 'yes' | 'no' | 'unknown';
+  estimatedMaceRisk?: number;
+  riskCalculator?: 'acs-nsqip' | 'gupta-mica';
   estimatedBloodLoss?: string;
   anesthesiaType?: string;
 
@@ -109,7 +126,6 @@ export interface SurgicalRisk {
 export interface RCRIResult {
   score: number;
   riskFactors: string[];
-  maceRisk: string;
   riskLevel: string;
   maxScore: number;
 }

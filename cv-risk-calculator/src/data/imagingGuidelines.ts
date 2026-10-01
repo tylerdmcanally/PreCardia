@@ -1,3 +1,5 @@
+// LEGACY: not used by PreCardia. These simplified AUC tables are not the 2026 guideline
+// decision pathway and must not be used for clinical output without a separate source audit.
 /**
  * 2024 ACC/AHA/ASE/ASNC/HFSA/HRS/SCAI/SCCT/SCMR/STS
  * Appropriate Use Criteria for Multimodality Imaging in Cardiovascular Evaluation

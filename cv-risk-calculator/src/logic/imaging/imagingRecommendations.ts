@@ -1,3 +1,5 @@
+// LEGACY: not used by PreCardia. These simplified AUC tables are not the 2026 guideline
+// decision pathway and must not be used for clinical output without a separate source audit.
 /**
  * Logic for determining appropriate preoperative imaging based on
  * 2024 ACC/AHA Appropriate Use Criteria
@@ -11,8 +13,7 @@ import {
   SURGICAL_RISK_CATEGORIES,
   getSurgicalRiskCategory,
   type ClinicalScenario,
-  type ImagingRecommendation,
-  type AppropriatenessRating
+  type ImagingRecommendation
 } from '../../data/imagingGuidelines';
 
 export interface ImagingInput {
@@ -99,7 +100,7 @@ export function getImagingRecommendations(input: ImagingInput): ImagingOutput {
   let scenario: ClinicalScenario;
   let section: number;
   let sectionDescription: string;
-  let clinicalGuidance: string[] = [];
+  const clinicalGuidance: string[] = [];
   
   // Section 1: No Known or Suspected Heart Disease
   if (!input.hasKnownHeartDisease) {

@@ -80,7 +80,7 @@ export function Home() {
                     PreCardia
                   </h2>
                   <p className="text-sm text-cardio-accent font-semibold mb-3">
-                    2024 ACC/AHA Perioperative Guidelines
+                    2026 AHA/ACC Perioperative Guideline
                   </p>
                 </div>
               </div>
@@ -92,7 +92,7 @@ export function Home() {
               <div className="space-y-2 text-sm text-gray-700">
                 <div className="flex items-start">
                   <span className="text-cardio-success mr-2">✓</span>
-                  <span>RCRI calculator and 30-day MACE risk</span>
+                  <span>RCRI and perioperative risk assessment</span>
                 </div>
                 <div className="flex items-start">
                   <span className="text-cardio-success mr-2">✓</span>

@@ -23,13 +23,13 @@ CardioTools is a unified web application that provides two comprehensive cardiov
   - Drug interaction checking and allergy management
 
 ### 2. PreCardia
-- **Based on:** 2024 ACC/AHA/ACCP/HRS Perioperative Guidelines
+- **Based on:** 2026 AHA/ACC multisociety perioperative guideline (2024 recommendations reaffirmed)
 - **Purpose:** Pre-operative cardiac risk assessment for non-cardiac surgery
 - **Features:**
   - Revised Cardiac Risk Index (RCRI) calculation
-  - 30-day MACE risk stratification
+  - RCRI risk stratification with optional clinician-entered NSQIP/MICA cardiac event estimates
   - Surgical risk categorization (low/intermediate/high)
-  - Functional capacity assessment (clinical or DASI questionnaire)
+  - Functional capacity assessment (clinical or completed DASI questionnaire; DASI ≤34 criterion)
   - Duke Activity Status Index (DASI) with 12-item questionnaire
   - Active cardiac condition screening
   - Recent cardiac intervention timing guidance (PCI, CABG, TAVR, MI)
@@ -48,7 +48,7 @@ CardioTools is a unified web application that provides two comprehensive cardiov
 ## Getting Started
 
 ### Prerequisites
-- Node.js (v18 or higher)
+- Node.js 22.12 or higher (Vite 7 and the test runner)
 - npm
 
 ### Installation
@@ -64,6 +64,16 @@ npm run dev
 ```
 
 The application will be available at `http://localhost:5173/` (or another port if 5173 is in use).
+
+### Guideline review and regression tests
+
+See [the 2026 alignment audit](../docs/PERIOPERATIVE_2026_ALIGNMENT.md) for source sections, corrected discrepancies, interpretation choices, and scope limits. PreCardia is an adult preoperative decision aid, not a complete anesthesia or postoperative treatment protocol.
+
+```bash
+npm test
+```
+
+Tests use the existing TypeScript compiler and Node test runner; no additional test packages are required.
 
 ### Building for Production
 
@@ -123,7 +133,7 @@ The production build in the `dist/` directory is a static site that can be deplo
 
 ### References
 1. **PREVENT Equations:** Khan SS, et al. Novel Prediction Equations for Absolute Risk Assessment of Total Cardiovascular Disease Incorporating Cardiovascular-Kidney-Metabolic Health. Circulation. 2023.
-2. **Perioperative Guidelines:** Fleisher LA, et al. 2024 ACC/AHA/ACCP/HRS Guideline for Perioperative Cardiovascular Evaluation and Management for Noncardiac Surgery.
+2. **Perioperative Guideline:** Thompson A, Fleischmann KE, Smilowitz NR, et al. 2026 AHA/ACC/ACS/ASNC/HRS/SCA/SCCT/SCMR/SVM Guideline for Perioperative Cardiovascular Management for Noncardiac Surgery. JACC. 2026;88:1543–1643. [doi:10.1016/j.jacc.2026.06.017](https://doi.org/10.1016/j.jacc.2026.06.017). Reaffirms the 2024 recommendations without changes.
 3. **CKD & Dialysis Care:** KDIGO 2024 CKD Guideline; KDIGO 2021 Blood Pressure in CKD; KDIGO 2022 Diabetes Management in CKD. Dialysis-specific safety and medication logic are incorporated for ACE/ARB/ARNI holds, SGLT2i discontinuation, and anticoagulation adjustments.
 
 ## License
@@ -131,6 +141,13 @@ The production build in the `dist/` directory is a static site that can be deplo
 This project is for medical education and clinical decision support purposes.
 
 ## Version History
+
+### Version 1.1.0 — October 1, 2026
+- Align PreCardia decision logic and reports with the reaffirmed 2026 perioperative guideline; see the [source-to-code audit](../docs/PERIOPERATIVE_2026_ALIGNMENT.md).
+- Correct DASI/testing eligibility, PCI timing, biomarkers, medication guidance, RCRI reporting and eGFR calculation.
+- Show version notes on the first visit to each release, including direct calculator links. Dismissal is saved per browser; notes can be reopened from **What’s new** at the bottom of any page.
+
+For each release, bump `package.json` and the root metadata in `package-lock.json`, then update `src/data/releaseNotes.ts`. The dialog reads its version directly from `package.json`; no separate version number needs to be maintained. It stores only the dismissed version in `localStorage` (`cardiotools:last-seen-version`). Clearing site data makes notes appear again. When storage is blocked, notes remain dismissible for the current visit but may reappear after reload.
 
 ### Version 1.0.0
 - Unified CardioTools application launch

@@ -1,7 +1,8 @@
 // PreCardia Calculation Functions
 
 import { PreCardiaData, RCRIResult, DASIResult, FunctionalCapacityInfo } from '../../types/precardia.types';
-import { RCRI_HIGH_RISK_SURGERIES, DASI_WEIGHTS } from './constants';
+import { RCRI_HIGH_RISK_SURGERIES, DASI_WEIGHTS, METS_VALUES } from './constants';
+import { calculateEGFR as calculateCKDEPI2021 } from '../calculations/egfr';
 
 // Unit conversions
 export function convertPoundsToKg(pounds: number): number {
@@ -21,7 +22,7 @@ export function convertCmToInches(cm: number): number {
 }
 
 // Calculate DASI score and METs
-export function calculateDASI(data: PreCardiaData): DASIResult {
+export function calculateDASI(data: Partial<PreCardiaData>): DASIResult {
   let dasiScore = 0;
 
   const dasiResponses = [
@@ -42,41 +43,34 @@ export function calculateDASI(data: PreCardiaData): DASIResult {
   const mets = vo2peak / 3.5;
 
   return {
-    score: dasiScore,
+    score: Math.round(dasiScore * 100) / 100,
     vo2peak,
     mets
   };
 }
 
-// Calculate eGFR using CKD-EPI equation
+// Use the same race-free CKD-EPI 2021 equation as CV Optimization.
 export function calculateEGFR(creatinine: number, age: number, sex: string): number | null {
-  if (!creatinine || !age || !sex || creatinine <= 0 || age <= 0) {
+  if (!Number.isFinite(creatinine) || !Number.isFinite(age) || creatinine <= 0 || age < 18 || (sex !== 'male' && sex !== 'female')) {
     return null;
   }
+  return calculateCKDEPI2021(creatinine, age, sex);
+}
 
-  let egfr: number;
-
-  if (sex === 'female') {
-    if (creatinine <= 0.7) {
-      egfr = 144 * Math.pow(creatinine / 0.7, -0.329) * Math.pow(0.993, age);
-    } else {
-      egfr = 144 * Math.pow(creatinine / 0.7, -1.209) * Math.pow(0.993, age);
-    }
-  } else {
-    // Male or other (use male formula)
-    if (creatinine <= 0.9) {
-      egfr = 141 * Math.pow(creatinine / 0.9, -0.411) * Math.pow(0.993, age);
-    } else {
-      egfr = 141 * Math.pow(creatinine / 0.9, -1.209) * Math.pow(0.993, age);
-    }
+// Sections 3.2, 4.3, 4.5: DASI <=34 is a separate criterion from estimated METs.
+export function getDASIFunctionalCapacity(result: DASIResult): FunctionalCapacityInfo {
+  if (result.score <= 34) {
+    return { value: result.mets.toFixed(1), description: 'Poor by DASI (score ≤34)', category: 'poor' };
   }
+  return getFunctionalCapacityCategory(result.mets);
+}
 
-  // Cap at maximum of 150
-  if (egfr > 150) {
-    egfr = 150;
+export function assessFunctionalCapacity(data: PreCardiaData): FunctionalCapacityInfo {
+  if (data.useDASI && data.dasiCompleted === true) {
+    return getDASIFunctionalCapacity(calculateDASI(data));
   }
-
-  return Math.round(egfr * 10) / 10; // Round to 1 decimal place
+  const category = data.useDASI ? 'unknown' : data.functionalCapacity || 'unknown';
+  return { ...METS_VALUES[category], category };
 }
 
 // Get functional capacity category from METs value
@@ -100,11 +94,11 @@ export function calculateRCRI(data: PreCardiaData): RCRIResult {
   const riskFactors: string[] = [];
 
   // RCRI clinical factors (5 factors)
-  if (data.ischemicHeartDisease) {
+  if (data.ischemicHeartDisease || data.recentMI === 'yes' || data.unstableAngina) {
     score++;
     riskFactors.push('Ischemic heart disease');
   }
-  if (data.heartFailure) {
+  if (data.heartFailure || data.decompensatedHF) {
     score++;
     riskFactors.push('Heart failure');
   }
@@ -116,39 +110,24 @@ export function calculateRCRI(data: PreCardiaData): RCRIResult {
     score++;
     riskFactors.push('Diabetes requiring insulin');
   }
-  if (data.renalDysfunction || (data.creatinine && data.creatinine > 2.0)) {
+  if (data.renalDysfunction || (data.creatinine !== undefined && data.creatinine >= 2.0)) {
     score++;
-    riskFactors.push('Renal dysfunction');
+    riskFactors.push('Serum creatinine ≥2.0 mg/dL (2026 guideline Table 4)');
   }
 
   // High-risk surgery (6th factor)
-  if (RCRI_HIGH_RISK_SURGERIES.has(data.surgeryType)) {
+  if (RCRI_HIGH_RISK_SURGERIES.has(data.surgeryType) || (data.surgeryType === 'other' && data.otherRcriHighRisk === 'yes')) {
     score++;
     riskFactors.push('High-risk surgery (intraperitoneal, intrathoracic, or suprainguinal vascular)');
   }
 
-  // Determine MACE risk based on RCRI score
-  let maceRisk: string;
-  let riskLevel: string;
-
-  if (score === 0) {
-    maceRisk = '0.4%';
-    riskLevel = 'Very Low';
-  } else if (score === 1) {
-    maceRisk = '0.9%';
-    riskLevel = 'Low';
-  } else if (score === 2) {
-    maceRisk = '6.6%';
-    riskLevel = 'Moderate';
-  } else {
-    maceRisk = '11.0%';
-    riskLevel = 'High';
-  }
+  // Table 4 / Figure 1 use RCRI >1. Historical RCRI complication rates are
+  // not interchangeable with a contemporary individualized 30-day MACE estimate.
+  const riskLevel = score > 1 ? 'Elevated by RCRI (>1)' : 'Lower by RCRI (0-1)';
 
   return {
     score,
     riskFactors,
-    maceRisk,
     riskLevel,
     maxScore: 6
   };
